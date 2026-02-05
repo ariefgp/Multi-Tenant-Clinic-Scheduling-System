@@ -1,0 +1,62 @@
+name: CD
+
+on:
+  push:
+    branches: [main]
+
+env:
+  GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  GCP_REGION: asia-southeast2
+  GKE_CLUSTER: clinic-cluster
+  AR_REPO: clinic
+
+jobs:
+  build-push-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Authenticate to GCP via Workload Identity Federation
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      # Setup gcloud + docker auth
+      - uses: google-github-actions/setup-gcloud@v2
+      - run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev
+
+      # Build & push backend image
+      - name: Build and push backend
+        run: |
+          docker build -t ${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.AR_REPO }}/backend:${{ github.sha }} ./backend
+          docker push ${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.AR_REPO }}/backend:${{ github.sha }}
+
+      # Build & push frontend image
+      - name: Build and push frontend
+        run: |
+          docker build --build-arg VITE_API_URL=/api -t ${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.AR_REPO }}/frontend:${{ github.sha }} ./frontend
+          docker push ${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.AR_REPO }}/frontend:${{ github.sha }}
+
+      # Get GKE credentials
+      - uses: google-github-actions/get-gke-credentials@v2
+        with:
+          cluster_name: ${{ env.GKE_CLUSTER }}
+          location: ${{ env.GCP_REGION }}
+
+      # Deploy to GKE
+      - name: Deploy to GKE
+        run: |
+          sed -i "s|backend:latest|backend:${{ github.sha }}|g" k8s/backend-deployment.yaml
+          sed -i "s|frontend:latest|frontend:${{ github.sha }}|g" k8s/frontend-deployment.yaml
+          sed -i "s|REGION|${{ env.GCP_REGION }}|g" k8s/*.yaml
+          sed -i "s|PROJECT_ID|${{ env.GCP_PROJECT_ID }}|g" k8s/*.yaml
+          kubectl apply -f k8s/namespace.yaml
+          kubectl apply -f k8s/
+          kubectl rollout status deployment/backend -n clinic --timeout=120s
+          kubectl rollout status deployment/frontend -n clinic --timeout=120s

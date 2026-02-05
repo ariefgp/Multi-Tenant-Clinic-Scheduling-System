@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-test-build:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: clinic_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: latest
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: |
+            backend/pnpm-lock.yaml
+            frontend/pnpm-lock.yaml
+
+      # Backend
+      - name: Install backend dependencies
+        run: cd backend && pnpm install --frozen-lockfile
+
+      - name: Lint backend
+        run: cd backend && pnpm lint
+
+      - name: Test backend
+        run: cd backend && pnpm test
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/clinic_test
+
+      - name: Build backend
+        run: cd backend && pnpm build
+
+      # Frontend
+      - name: Install frontend dependencies
+        run: cd frontend && pnpm install --frozen-lockfile
+
+      - name: Build frontend
+        run: cd frontend && pnpm build
