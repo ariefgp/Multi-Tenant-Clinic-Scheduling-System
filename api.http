@@ -1,0 +1,85 @@
+### Health Check
+GET http://localhost:3000/api/health
+
+### List Tenants
+GET http://localhost:3000/api/tenants
+X-Tenant-Id: 1
+
+### List Doctors
+GET http://localhost:3000/api/doctors
+X-Tenant-Id: 1
+
+### List Patients
+GET http://localhost:3000/api/patients
+X-Tenant-Id: 1
+
+### List Services
+GET http://localhost:3000/api/services
+X-Tenant-Id: 1
+
+### List Rooms
+GET http://localhost:3000/api/rooms
+X-Tenant-Id: 1
+
+### List Devices
+GET http://localhost:3000/api/devices
+X-Tenant-Id: 1
+
+### Search Availability
+GET http://localhost:3000/api/availability?service_id=1&from=2026-02-09T08:00:00%2B01:00&to=2026-02-13T18:00:00%2B01:00&limit=5
+X-Tenant-Id: 1
+
+### Search Availability (specific doctor)
+GET http://localhost:3000/api/availability?service_id=1&doctor_ids=101&from=2026-02-09T08:00:00%2B01:00&to=2026-02-13T18:00:00%2B01:00
+X-Tenant-Id: 1
+
+### Create Appointment
+POST http://localhost:3000/api/appointments
+Content-Type: application/json
+X-Tenant-Id: 1
+
+{
+  "doctor_id": 101,
+  "patient_id": 501,
+  "service_id": 1,
+  "room_id": 11,
+  "starts_at": "2026-02-09T09:00:00+01:00"
+}
+
+### Get Appointment
+GET http://localhost:3000/api/appointments/1
+X-Tenant-Id: 1
+
+### Get Doctor Schedule
+GET http://localhost:3000/api/doctors/101/schedule?from=2026-02-09T00:00:00%2B01:00&to=2026-02-15T23:59:59%2B01:00
+X-Tenant-Id: 1
+
+### Get All Schedule
+GET http://localhost:3000/api/schedule?from=2026-02-09T00:00:00%2B01:00&to=2026-02-15T23:59:59%2B01:00
+X-Tenant-Id: 1
+
+### Reschedule Appointment
+PATCH http://localhost:3000/api/appointments/1
+Content-Type: application/json
+X-Tenant-Id: 1
+
+{
+  "starts_at": "2026-02-10T10:00:00+01:00"
+}
+
+### Cancel Appointment
+DELETE http://localhost:3000/api/appointments/1
+X-Tenant-Id: 1
+
+### Create Appointment (Phone Consultation - no room)
+POST http://localhost:3000/api/appointments
+Content-Type: application/json
+X-Tenant-Id: 1
+
+{
+  "doctor_id": 101,
+  "patient_id": 502,
+  "service_id": 5,
+  "room_id": null,
+  "starts_at": "2026-02-09T14:00:00+01:00"
+}
