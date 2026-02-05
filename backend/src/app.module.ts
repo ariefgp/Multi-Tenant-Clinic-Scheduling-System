@@ -17,7 +17,7 @@ import { AppService } from './app.service.js';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: ['.env.local', '.env'],
+      envFilePath: ['.env.local', '../.env.local', '.env', '../.env'],
     }),
     DatabaseModule,
     TenantModule,
