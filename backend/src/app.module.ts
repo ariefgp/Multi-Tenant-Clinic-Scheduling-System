@@ -9,6 +9,7 @@ import { ServiceModule } from './modules/service/service.module.js';
 import { RoomModule } from './modules/room/room.module.js';
 import { DeviceModule } from './modules/device/device.module.js';
 import { AppointmentModule } from './modules/appointment/appointment.module.js';
+import { AvailabilityModule } from './modules/availability/availability.module.js';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 
@@ -26,6 +27,7 @@ import { AppService } from './app.service.js';
     RoomModule,
     DeviceModule,
     AppointmentModule,
+    AvailabilityModule,
   ],
   controllers: [AppController],
   providers: [AppService],
