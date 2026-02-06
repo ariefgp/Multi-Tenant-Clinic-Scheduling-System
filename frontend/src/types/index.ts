@@ -88,3 +88,22 @@ export interface ConflictError {
     resourceName: string;
   }[];
 }
+
+export interface User {
+  id: number;
+  tenantId: number;
+  email: string;
+  name: string;
+  picture: string | null;
+  role: string;
+}
+
+export interface AuthTokens {
+  accessToken: string;
+  refreshToken: string;
+}
+
+export interface AuthResponse {
+  user: User;
+  tokens: AuthTokens;
+}
