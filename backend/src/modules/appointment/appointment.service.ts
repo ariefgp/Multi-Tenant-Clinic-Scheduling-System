@@ -484,12 +484,9 @@ export class AppointmentService {
     doctorId: number,
     serviceId: number,
   ): Promise<void> {
-    // Note: Only select service_id and doctor_id (tenant_id may not exist in older DBs)
+    // Note: tenant_id check is implicit since service_id and doctor_id are already tenant-scoped
     const [assignment] = await this.db
-      .select({
-        serviceId: serviceDoctors.serviceId,
-        doctorId: serviceDoctors.doctorId,
-      })
+      .select()
       .from(serviceDoctors)
       .where(
         and(

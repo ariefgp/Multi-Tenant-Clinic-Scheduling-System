@@ -28,7 +28,10 @@ export async function runMigrations(): Promise<void> {
   `;
 
   if (tableCheck[0]?.exists) {
-    console.log('Database schema already exists, checking for missing tables...');
+    console.log('Database schema already exists, checking for missing columns/tables...');
+
+    // Add missing columns to existing tables
+    await addMissingColumns(sql);
 
     // Ensure critical tables exist (may have been added after initial migration)
     await ensureCriticalTables(sql);
@@ -449,6 +452,40 @@ export async function runMigrations(): Promise<void> {
   } else {
     console.log('Seed data already exists, skipping');
   }
+}
+
+// Add missing columns to existing tables
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function addMissingColumns(sql: any): Promise<void> {
+  // Add tenant_id to service_doctors if missing
+  await sql`
+    ALTER TABLE service_doctors
+    ADD COLUMN IF NOT EXISTS tenant_id BIGINT REFERENCES tenants(id) ON DELETE CASCADE
+  `;
+
+  // Update existing rows to have tenant_id from the service's tenant
+  await sql`
+    UPDATE service_doctors sd
+    SET tenant_id = s.tenant_id
+    FROM services s
+    WHERE sd.service_id = s.id AND sd.tenant_id IS NULL
+  `;
+
+  // Add tenant_id to service_devices if missing
+  await sql`
+    ALTER TABLE service_devices
+    ADD COLUMN IF NOT EXISTS tenant_id BIGINT REFERENCES tenants(id) ON DELETE CASCADE
+  `;
+
+  // Update existing rows to have tenant_id from the service's tenant
+  await sql`
+    UPDATE service_devices sd
+    SET tenant_id = s.tenant_id
+    FROM services s
+    WHERE sd.service_id = s.id AND sd.tenant_id IS NULL
+  `;
+
+  console.log('Missing columns added');
 }
 
 // Ensure critical tables exist for existing databases
