@@ -1,8 +1,29 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, addDays } from 'date-fns';
-import { X } from 'lucide-react';
-import { servicesApi, doctorsApi, patientsApi, availabilityApi, appointmentsApi } from '../api/index.ts';
+import {
+  servicesApi,
+  doctorsApi,
+  patientsApi,
+  availabilityApi,
+  appointmentsApi,
+} from '../api/index.ts';
+import { cn } from '../lib/utils.ts';
+import { Button } from './ui/button.tsx';
+import { Card, CardContent } from './ui/card.tsx';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from './ui/dialog.tsx';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from './ui/select.tsx';
 import type { AvailableSlot } from '../types/index.ts';
 
 type Step = 'select' | 'slots' | 'confirm';
@@ -38,7 +59,12 @@ export function BookingModal({ initialDate, onClose }: BookingModalProps) {
 
   const fromDate = initialDate ?? new Date();
   const { data: availability, isLoading: isLoadingSlots } = useQuery({
-    queryKey: ['availability', selectedService, selectedDoctor, fromDate.toISOString()],
+    queryKey: [
+      'availability',
+      selectedService,
+      selectedDoctor,
+      fromDate.toISOString(),
+    ],
     queryFn: () =>
       availabilityApi.search({
         service_id: selectedService!,
@@ -58,7 +84,9 @@ export function BookingModal({ initialDate, onClose }: BookingModalProps) {
     },
     onError: (err: unknown) => {
       const axiosErr = err as { response?: { data?: { message?: string } } };
-      setError(axiosErr.response?.data?.message ?? 'Failed to create appointment');
+      setError(
+        axiosErr.response?.data?.message ?? 'Failed to create appointment',
+      );
     },
   });
 
@@ -74,79 +102,83 @@ export function BookingModal({ initialDate, onClose }: BookingModalProps) {
     });
   };
 
-  const selectedServiceData = servicesList?.find((s) => s.id === selectedService);
+  const selectedServiceData = servicesList?.find(
+    (s) => s.id === selectedService,
+  );
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 relative max-h-[90vh] overflow-y-auto">
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
-        >
-          <X className="w-5 h-5" />
-        </button>
-
-        <h2 className="text-xl font-semibold mb-4">Book Appointment</h2>
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Book Appointment</DialogTitle>
+        </DialogHeader>
 
         {step === 'select' && (
           <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">Service</label>
-              <select
-                className="w-full border rounded-md p-2"
-                value={selectedService ?? ''}
-                onChange={(e) => setSelectedService(Number(e.target.value) || null)}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Service</label>
+              <Select
+                value={selectedService?.toString() ?? ''}
+                onValueChange={(val) => setSelectedService(Number(val) || null)}
               >
-                <option value="">Select a service</option>
-                {servicesList?.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name} ({s.durationMinutes} min)
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a service" />
+                </SelectTrigger>
+                <SelectContent>
+                  {servicesList?.map((s) => (
+                    <SelectItem key={s.id} value={s.id.toString()}>
+                      {s.name} ({s.durationMinutes} min)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Doctor (optional)
-              </label>
-              <select
-                className="w-full border rounded-md p-2"
-                value={selectedDoctor ?? ''}
-                onChange={(e) => setSelectedDoctor(Number(e.target.value) || null)}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Doctor (optional)</label>
+              <Select
+                value={selectedDoctor?.toString() ?? ''}
+                onValueChange={(val) => setSelectedDoctor(Number(val) || null)}
               >
-                <option value="">Any available doctor</option>
-                {doctorsList?.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.name}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger>
+                  <SelectValue placeholder="Any available doctor" />
+                </SelectTrigger>
+                <SelectContent>
+                  {doctorsList?.map((d) => (
+                    <SelectItem key={d.id} value={d.id.toString()}>
+                      {d.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium mb-1">Patient</label>
-              <select
-                className="w-full border rounded-md p-2"
-                value={selectedPatient ?? ''}
-                onChange={(e) => setSelectedPatient(Number(e.target.value) || null)}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Patient</label>
+              <Select
+                value={selectedPatient?.toString() ?? ''}
+                onValueChange={(val) => setSelectedPatient(Number(val) || null)}
               >
-                <option value="">Select a patient</option>
-                {patientsList?.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a patient" />
+                </SelectTrigger>
+                <SelectContent>
+                  {patientsList?.map((p) => (
+                    <SelectItem key={p.id} value={p.id.toString()}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
-            <button
-              className="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 disabled:opacity-50"
+            <Button
+              className="w-full"
               disabled={!selectedService || !selectedPatient}
               onClick={() => setStep('slots')}
             >
               Find Available Slots
-            </button>
+            </Button>
           </div>
         )}
 
@@ -155,27 +187,26 @@ export function BookingModal({ initialDate, onClose }: BookingModalProps) {
             <h3 className="font-medium">Available Slots</h3>
 
             {isLoadingSlots && (
-              <p className="text-gray-500 text-sm">Searching...</p>
+              <p className="text-sm text-gray-500">Searching...</p>
             )}
 
             {!isLoadingSlots && availability?.slots.length === 0 && (
-              <p className="text-gray-500 text-sm">
+              <p className="text-sm text-gray-500">
                 No available slots found in the next 7 days.
               </p>
             )}
 
-            <div className="space-y-2 max-h-64 overflow-y-auto">
+            <div className="max-h-64 space-y-2 overflow-y-auto">
               {availability?.slots.map((slot, idx) => (
                 <button
                   key={idx}
-                  className={`w-full p-3 border rounded-md text-left hover:border-blue-500 transition-colors ${
-                    selectedSlot === slot
-                      ? 'border-blue-500 bg-blue-50'
-                      : ''
-                  }`}
+                  className={cn(
+                    'w-full rounded-md border p-3 text-left transition-colors hover:border-blue-500',
+                    selectedSlot === slot && 'border-blue-500 bg-blue-50',
+                  )}
                   onClick={() => setSelectedSlot(slot)}
                 >
-                  <div className="font-medium text-sm">
+                  <div className="text-sm font-medium">
                     {format(new Date(slot.start), 'EEE, MMM d')} at{' '}
                     {format(new Date(slot.start), 'h:mm a')}
                   </div>
@@ -188,22 +219,23 @@ export function BookingModal({ initialDate, onClose }: BookingModalProps) {
             </div>
 
             <div className="flex gap-2">
-              <button
-                className="flex-1 border py-2 rounded-md hover:bg-gray-50 text-sm"
+              <Button
+                variant="outline"
+                className="flex-1"
                 onClick={() => {
                   setSelectedSlot(null);
                   setStep('select');
                 }}
               >
                 Back
-              </button>
-              <button
-                className="flex-1 bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 text-sm"
+              </Button>
+              <Button
+                className="flex-1"
                 disabled={!selectedSlot}
                 onClick={() => setStep('confirm')}
               >
                 Continue
-              </button>
+              </Button>
             </div>
           </div>
         )}
@@ -213,55 +245,58 @@ export function BookingModal({ initialDate, onClose }: BookingModalProps) {
             <h3 className="font-medium">Confirm Booking</h3>
 
             {error && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">
+              <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
                 {error}
               </div>
             )}
 
-            <div className="p-4 bg-gray-50 rounded-md space-y-2 text-sm">
-              <p>
-                <span className="font-medium">Service:</span>{' '}
-                {selectedServiceData?.name}
-              </p>
-              <p>
-                <span className="font-medium">Doctor:</span>{' '}
-                {selectedSlot.doctor_name}
-              </p>
-              <p>
-                <span className="font-medium">Date:</span>{' '}
-                {format(new Date(selectedSlot.start), 'EEEE, MMMM d, yyyy')}
-              </p>
-              <p>
-                <span className="font-medium">Time:</span>{' '}
-                {format(new Date(selectedSlot.start), 'h:mm a')} -{' '}
-                {format(new Date(selectedSlot.end), 'h:mm a')}
-              </p>
-              {selectedSlot.room_name && (
+            <Card>
+              <CardContent className="space-y-2 p-4 text-sm">
                 <p>
-                  <span className="font-medium">Room:</span>{' '}
-                  {selectedSlot.room_name}
+                  <span className="font-medium">Service:</span>{' '}
+                  {selectedServiceData?.name}
                 </p>
-              )}
-            </div>
+                <p>
+                  <span className="font-medium">Doctor:</span>{' '}
+                  {selectedSlot.doctor_name}
+                </p>
+                <p>
+                  <span className="font-medium">Date:</span>{' '}
+                  {format(new Date(selectedSlot.start), 'EEEE, MMMM d, yyyy')}
+                </p>
+                <p>
+                  <span className="font-medium">Time:</span>{' '}
+                  {format(new Date(selectedSlot.start), 'h:mm a')} -{' '}
+                  {format(new Date(selectedSlot.end), 'h:mm a')}
+                </p>
+                {selectedSlot.room_name && (
+                  <p>
+                    <span className="font-medium">Room:</span>{' '}
+                    {selectedSlot.room_name}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
 
             <div className="flex gap-2">
-              <button
-                className="flex-1 border py-2 rounded-md hover:bg-gray-50 text-sm"
+              <Button
+                variant="outline"
+                className="flex-1"
                 onClick={() => setStep('slots')}
               >
                 Back
-              </button>
-              <button
-                className="flex-1 bg-green-600 text-white py-2 rounded-md hover:bg-green-700 disabled:opacity-50 text-sm"
+              </Button>
+              <Button
+                className="flex-1 bg-green-600 hover:bg-green-700"
                 disabled={createMutation.isPending}
                 onClick={handleConfirm}
               >
                 {createMutation.isPending ? 'Booking...' : 'Confirm Booking'}
-              </button>
+              </Button>
             </div>
           </div>
         )}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

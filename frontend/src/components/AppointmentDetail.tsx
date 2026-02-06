@@ -1,13 +1,32 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
-import { X } from 'lucide-react';
 import { appointmentsApi } from '../api/index.ts';
+import { Badge } from './ui/badge.tsx';
+import { Button } from './ui/button.tsx';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from './ui/dialog.tsx';
+import { Separator } from './ui/separator.tsx';
 import type { Appointment } from '../types/index.ts';
 
 interface AppointmentDetailProps {
   appointment: Appointment;
   onClose: () => void;
 }
+
+const statusVariantMap: Record<
+  string,
+  'default' | 'success' | 'warning' | 'destructive'
+> = {
+  scheduled: 'default',
+  confirmed: 'success',
+  cancelled: 'destructive',
+  completed: 'success',
+  'no-show': 'warning',
+};
 
 export function AppointmentDetail({
   appointment,
@@ -24,16 +43,11 @@ export function AppointmentDetail({
   });
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-sm p-6 relative">
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
-        >
-          <X className="w-5 h-5" />
-        </button>
-
-        <h2 className="text-lg font-semibold mb-4">Appointment Details</h2>
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Appointment Details</DialogTitle>
+        </DialogHeader>
 
         <div className="space-y-3 text-sm">
           <div>
@@ -48,6 +62,9 @@ export function AppointmentDetail({
             <span className="text-gray-500">Doctor</span>
             <p className="font-medium">{appointment.doctorName}</p>
           </div>
+
+          <Separator />
+
           <div>
             <span className="text-gray-500">Date & Time</span>
             <p className="font-medium">
@@ -65,7 +82,11 @@ export function AppointmentDetail({
           )}
           <div>
             <span className="text-gray-500">Status</span>
-            <p className="font-medium capitalize">{appointment.status}</p>
+            <div className="mt-1">
+              <Badge variant={statusVariantMap[appointment.status] ?? 'default'}>
+                {appointment.status}
+              </Badge>
+            </div>
           </div>
           {appointment.notes && (
             <div>
@@ -75,24 +96,22 @@ export function AppointmentDetail({
           )}
         </div>
 
-        <div className="mt-6 flex gap-2">
-          <button
-            onClick={onClose}
-            className="flex-1 border py-2 rounded-md hover:bg-gray-50 text-sm"
-          >
+        <div className="mt-2 flex gap-2">
+          <Button variant="outline" className="flex-1" onClick={onClose}>
             Close
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="destructive"
+            className="flex-1"
             onClick={() => cancelMutation.mutate()}
             disabled={
               cancelMutation.isPending || appointment.status === 'cancelled'
             }
-            className="flex-1 bg-red-600 text-white py-2 rounded-md hover:bg-red-700 disabled:opacity-50 text-sm"
           >
             {cancelMutation.isPending ? 'Cancelling...' : 'Cancel Appointment'}
-          </button>
+          </Button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
