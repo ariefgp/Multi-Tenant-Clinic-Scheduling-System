@@ -86,6 +86,27 @@ describe('Concurrent Booking (e2e)', () => {
       response1.status === HttpStatus.CREATED ? response1 : response2;
     const createdAppointmentId = successResponse.body.id;
 
+    // CRITICAL: Verify only ONE appointment was persisted
+    // Query all appointments for this doctor at this time
+    const scheduleResponse = await request(app.getHttpServer())
+      .get('/api/appointments')
+      .query({
+        doctor_id: appointmentData.doctor_id,
+        from: startsAt.toISOString(),
+        to: new Date(startsAt.getTime() + 60 * 60 * 1000).toISOString(),
+      })
+      .set('X-Tenant-Id', tenantId);
+
+    // Filter to only appointments at our exact start time
+    const appointmentsAtSlot = (scheduleResponse.body || []).filter(
+      (appt: { startsAt: string }) =>
+        new Date(appt.startsAt).getTime() === startsAt.getTime(),
+    );
+
+    // Verify exactly ONE appointment exists (the race was prevented)
+    expect(appointmentsAtSlot.length).toBe(1);
+    expect(appointmentsAtSlot[0].id).toBe(createdAppointmentId);
+
     // Clean up: Cancel the created appointment
     if (createdAppointmentId) {
       await request(app.getHttpServer())
