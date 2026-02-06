@@ -7,7 +7,7 @@ import { doctorsApi } from '../api/index.ts';
 export function DoctorsPage() {
   const { data: doctors, isLoading, error } = useQuery({
     queryKey: ['doctors'],
-    queryFn: doctorsApi.list,
+    queryFn: () => doctorsApi.list(),
   });
 
   return (
