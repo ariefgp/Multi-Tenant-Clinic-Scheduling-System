@@ -2,7 +2,8 @@ import { useRef, useEffect } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
-import type { EventClickArg, DateClickArg } from '@fullcalendar/core';
+import type { EventClickArg } from '@fullcalendar/core';
+import type { DateClickArg } from '@fullcalendar/interaction';
 import type { Appointment } from '../types/index.ts';
 
 interface WeekCalendarProps {
