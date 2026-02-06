@@ -56,9 +56,10 @@ export class AvailabilityService {
     const bufferAfter = service.bufferAfterMin;
     const totalDuration = bufferBefore + slotDuration + bufferAfter;
 
+    const serviceDoctorIdSet = new Set(service.doctorIds);
     const doctorIds =
       params.doctorIds && params.doctorIds.length > 0
-        ? params.doctorIds
+        ? params.doctorIds.filter((id) => serviceDoctorIdSet.has(id))
         : service.doctorIds;
 
     if (doctorIds.length === 0) return [];

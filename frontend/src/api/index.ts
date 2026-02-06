@@ -10,7 +10,8 @@ import type {
 } from '../types/index.ts';
 
 export const doctorsApi = {
-  list: () => api.get<Doctor[]>('/doctors').then((r) => r.data),
+  list: (params?: { service_id?: number }) =>
+    api.get<Doctor[]>('/doctors', { params }).then((r) => r.data),
 };
 
 export const patientsApi = {

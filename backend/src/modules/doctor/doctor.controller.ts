@@ -2,10 +2,11 @@ import {
   Controller,
   Get,
   Param,
+  Query,
   ParseIntPipe,
   NotFoundException,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { TenantId } from '../../common/decorators/tenant-id.decorator.js';
 import { DoctorService } from './doctor.service.js';
 
@@ -15,9 +16,14 @@ export class DoctorController {
   constructor(private readonly doctorService: DoctorService) {}
 
   @Get()
-  @ApiOperation({ summary: 'List all active doctors' })
-  async findAll(@TenantId() tenantId: number) {
-    return this.doctorService.findAll(tenantId);
+  @ApiOperation({ summary: 'List active doctors, optionally filtered by service' })
+  @ApiQuery({ name: 'service_id', required: false, type: Number })
+  async findAll(
+    @TenantId() tenantId: number,
+    @Query('service_id') serviceIdParam?: string,
+  ) {
+    const serviceId = serviceIdParam ? Number(serviceIdParam) : undefined;
+    return this.doctorService.findAll(tenantId, serviceId);
   }
 
   @Get(':id')

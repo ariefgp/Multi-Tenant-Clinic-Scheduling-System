@@ -47,8 +47,13 @@ export function BookingModal({ initialDate, onClose }: BookingModalProps) {
   });
 
   const { data: doctorsList } = useQuery({
-    queryKey: ['doctors'],
-    queryFn: doctorsApi.list,
+    queryKey: ['doctors', selectedService],
+    queryFn: () =>
+      doctorsApi.list(
+        selectedService
+          ? { service_id: Number(selectedService) }
+          : undefined,
+      ),
   });
 
   const { data: patientsList } = useQuery({
@@ -99,6 +104,11 @@ export function BookingModal({ initialDate, onClose }: BookingModalProps) {
       device_ids: selectedSlot.device_ids,
       starts_at: selectedSlot.start,
     });
+  };
+
+  const handleServiceChange = (value: string | null) => {
+    setSelectedService(value);
+    setSelectedDoctor(null);
   };
 
   const selectedServiceData = servicesList?.find(
@@ -173,7 +183,7 @@ export function BookingModal({ initialDate, onClose }: BookingModalProps) {
               <Combobox
                 options={serviceOptions}
                 value={selectedService}
-                onValueChange={setSelectedService}
+                onValueChange={handleServiceChange}
                 placeholder="Select a service"
                 searchPlaceholder="Search services..."
               />
