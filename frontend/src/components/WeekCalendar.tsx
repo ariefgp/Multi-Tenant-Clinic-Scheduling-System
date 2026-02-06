@@ -55,7 +55,46 @@ export function WeekCalendar({
   };
 
   return (
-    <div className="h-full [&_.fc]:h-full [&_.fc-timegrid-slot]:h-20 [&_.fc-col-header-cell]:py-3 [&_.fc-timegrid-axis]:w-20 [&_.fc-scrollgrid]:border-0 [&_.fc-theme-standard_td]:border-gray-200 [&_.fc-theme-standard_th]:border-gray-200 [&_.fc-day-today]:bg-blue-50/50 [&_.fc-timegrid-event]:rounded [&_.fc-timegrid-event]:px-2 [&_.fc-event-title]:text-sm [&_.fc-event-title]:font-medium [&_.fc-toolbar]:hidden [&_.fc-timegrid-slot-label]:text-sm">
+    <div className="week-calendar-wrapper h-full overflow-auto">
+      <style>{`
+        .week-calendar-wrapper .fc {
+          height: auto !important;
+        }
+        .week-calendar-wrapper .fc-timegrid-slot {
+          height: 4rem !important;
+          min-height: 4rem !important;
+        }
+        .week-calendar-wrapper .fc-timegrid-slot-lane {
+          height: 4rem !important;
+        }
+        .week-calendar-wrapper .fc-col-header-cell {
+          padding: 0.75rem 0;
+        }
+        .week-calendar-wrapper .fc-scrollgrid {
+          border: 0;
+        }
+        .week-calendar-wrapper .fc-theme-standard td,
+        .week-calendar-wrapper .fc-theme-standard th {
+          border-color: #e5e7eb;
+        }
+        .week-calendar-wrapper .fc-day-today {
+          background-color: rgba(239, 246, 255, 0.5) !important;
+        }
+        .week-calendar-wrapper .fc-timegrid-event {
+          border-radius: 0.25rem;
+          padding: 0.25rem 0.5rem;
+        }
+        .week-calendar-wrapper .fc-event-title {
+          font-size: 0.875rem;
+          font-weight: 500;
+        }
+        .week-calendar-wrapper .fc-toolbar {
+          display: none;
+        }
+        .week-calendar-wrapper .fc-timegrid-axis {
+          width: 5rem;
+        }
+      `}</style>
       <FullCalendar
         ref={calendarRef}
         plugins={[timeGridPlugin, interactionPlugin]}
@@ -71,7 +110,8 @@ export function WeekCalendar({
         events={events}
         eventClick={handleEventClick}
         dateClick={handleDateClick}
-        height="100%"
+        height="auto"
+        expandRows={false}
         nowIndicator={true}
         dayHeaderFormat={{ weekday: 'short', day: 'numeric' }}
         slotLabelFormat={{ hour: 'numeric', meridiem: 'short' }}
