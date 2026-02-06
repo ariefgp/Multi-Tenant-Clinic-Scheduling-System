@@ -28,7 +28,10 @@ export async function runMigrations(): Promise<void> {
   `;
 
   if (tableCheck[0]?.exists) {
-    console.log('Database schema already exists, skipping migration');
+    console.log('Database schema already exists, checking for missing tables...');
+
+    // Ensure critical tables exist (may have been added after initial migration)
+    await ensureCriticalTables(sql);
     return;
   }
 
@@ -446,6 +449,95 @@ export async function runMigrations(): Promise<void> {
   } else {
     console.log('Seed data already exists, skipping');
   }
+}
+
+// Ensure critical tables exist for existing databases
+// This handles the case where tables were added after initial migration
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function ensureCriticalTables(sql: any): Promise<void> {
+  // Check and create service_doctors if missing
+  await sql`
+    CREATE TABLE IF NOT EXISTS service_doctors (
+      service_id BIGINT NOT NULL REFERENCES services(id) ON DELETE CASCADE,
+      doctor_id BIGINT NOT NULL REFERENCES doctors(id) ON DELETE CASCADE,
+      tenant_id BIGINT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      PRIMARY KEY (service_id, doctor_id)
+    )
+  `;
+
+  // Check and create service_devices if missing
+  await sql`
+    CREATE TABLE IF NOT EXISTS service_devices (
+      service_id BIGINT NOT NULL REFERENCES services(id) ON DELETE CASCADE,
+      device_id BIGINT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+      tenant_id BIGINT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      PRIMARY KEY (service_id, device_id)
+    )
+  `;
+
+  // Check and create working_hours if missing
+  await sql`
+    CREATE TABLE IF NOT EXISTS working_hours (
+      id BIGSERIAL PRIMARY KEY,
+      tenant_id BIGINT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      doctor_id BIGINT NOT NULL REFERENCES doctors(id) ON DELETE CASCADE,
+      day_of_week SMALLINT NOT NULL CHECK (day_of_week BETWEEN 0 AND 6),
+      start_time TIME NOT NULL,
+      end_time TIME NOT NULL,
+      UNIQUE(doctor_id, day_of_week, start_time)
+    )
+  `;
+
+  // Check and create breaks if missing
+  await sql`
+    CREATE TABLE IF NOT EXISTS breaks (
+      id BIGSERIAL PRIMARY KEY,
+      tenant_id BIGINT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      doctor_id BIGINT NOT NULL REFERENCES doctors(id) ON DELETE CASCADE,
+      start_time TIMESTAMPTZ NOT NULL,
+      end_time TIMESTAMPTZ NOT NULL,
+      reason VARCHAR(255)
+    )
+  `;
+
+  // Ensure seed data exists for service_doctors
+  const serviceDoctorsCheck = await sql`SELECT COUNT(*) as count FROM service_doctors WHERE tenant_id = 1` as { count: string }[];
+  if (Number(serviceDoctorsCheck[0]?.count) === 0) {
+    console.log('Inserting missing service_doctors seed data...');
+    await sql`
+      INSERT INTO service_doctors (service_id, doctor_id, tenant_id) VALUES
+      (1, 1, 1), (1, 2, 1), (1, 3, 1),
+      (2, 1, 1), (2, 2, 1), (2, 3, 1),
+      (3, 1, 1), (3, 2, 1),
+      (4, 1, 1), (4, 3, 1)
+      ON CONFLICT DO NOTHING
+    `;
+  }
+
+  // Ensure seed data exists for working_hours
+  const workingHoursCheck = await sql`SELECT COUNT(*) as count FROM working_hours WHERE tenant_id = 1` as { count: string }[];
+  if (Number(workingHoursCheck[0]?.count) === 0) {
+    console.log('Inserting missing working_hours seed data...');
+    await sql`
+      INSERT INTO working_hours (tenant_id, doctor_id, day_of_week, start_time, end_time) VALUES
+      (1, 1, 1, '09:00', '12:00'), (1, 1, 1, '14:00', '17:00'),
+      (1, 1, 2, '09:00', '12:00'), (1, 1, 2, '14:00', '17:00'),
+      (1, 1, 3, '09:00', '12:00'), (1, 1, 3, '14:00', '17:00'),
+      (1, 1, 4, '09:00', '12:00'), (1, 1, 4, '14:00', '17:00'),
+      (1, 1, 5, '09:00', '12:00'),
+      (1, 2, 1, '08:00', '15:00'),
+      (1, 2, 2, '08:00', '15:00'),
+      (1, 2, 3, '08:00', '15:00'),
+      (1, 2, 4, '08:00', '15:00'),
+      (1, 2, 5, '08:00', '15:00'),
+      (1, 3, 1, '10:00', '18:00'),
+      (1, 3, 3, '10:00', '18:00'),
+      (1, 3, 5, '10:00', '18:00')
+      ON CONFLICT DO NOTHING
+    `;
+  }
+
+  console.log('Critical tables verified');
 }
 
 // Run directly if called as script
