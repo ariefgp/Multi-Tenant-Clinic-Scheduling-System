@@ -92,7 +92,7 @@ export class AvailabilityService {
     // Build working hours map: `${doctorId}-${weekday}` -> TimeInterval[]
     const whMap = new Map<string, { startTime: string; endTime: string }[]>();
     for (const wh of workingHoursData) {
-      const key = `${wh.doctorId}-${wh.weekday}`;
+      const key = `${wh.doctorId}-${wh.dayOfWeek}`;
       const existing = whMap.get(key) ?? [];
       existing.push({ startTime: wh.startTime, endTime: wh.endTime });
       whMap.set(key, existing);

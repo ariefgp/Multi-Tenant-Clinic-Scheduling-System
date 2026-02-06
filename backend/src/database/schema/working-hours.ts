@@ -19,7 +19,7 @@ export const workingHours = pgTable(
     doctorId: bigint('doctor_id', { mode: 'number' })
       .notNull()
       .references(() => doctors.id, { onDelete: 'cascade' }),
-    weekday: smallint().notNull(),
+    dayOfWeek: smallint('day_of_week').notNull(),
     startTime: time('start_time').notNull(),
     endTime: time('end_time').notNull(),
   },
@@ -27,7 +27,7 @@ export const workingHours = pgTable(
     index('idx_working_hours_doctor_day').on(
       table.tenantId,
       table.doctorId,
-      table.weekday,
+      table.dayOfWeek,
     ),
   ],
 );
