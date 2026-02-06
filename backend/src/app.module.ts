@@ -10,6 +10,7 @@ import { RoomModule } from './modules/room/room.module.js';
 import { DeviceModule } from './modules/device/device.module.js';
 import { AppointmentModule } from './modules/appointment/appointment.module.js';
 import { AvailabilityModule } from './modules/availability/availability.module.js';
+import { AuthModule } from './modules/auth/auth.module.js';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 
@@ -20,6 +21,7 @@ import { AppService } from './app.service.js';
       envFilePath: ['.env.local', '../.env.local', '.env', '../.env'],
     }),
     DatabaseModule,
+    AuthModule,
     TenantModule,
     DoctorModule,
     PatientModule,
@@ -36,7 +38,7 @@ export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
     consumer
       .apply(TenantMiddleware)
-      .exclude('health', 'docs', 'docs/(.*)')
+      .exclude('health', 'docs', 'docs/(.*)', 'auth', 'auth/(.*)')
       .forRoutes('*');
   }
 }
