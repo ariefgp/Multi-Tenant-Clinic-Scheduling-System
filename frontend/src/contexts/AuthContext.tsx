@@ -55,10 +55,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
           setUser(freshUser);
           setStoredAuth({ ...storedAuth, user: freshUser });
         })
-        .catch(() => {
-          clearStoredAuth();
-          delete api.defaults.headers.common['Authorization'];
-          setUser(null);
+        .catch((error: unknown) => {
+          // Only clear auth on explicit 401 (after refresh attempt failed)
+          // Keep user logged in for network errors or server errors during deploy
+          const axiosError = error as { response?: { status?: number } };
+          if (axiosError.response?.status === 401) {
+            clearStoredAuth();
+            delete api.defaults.headers.common['Authorization'];
+            setUser(null);
+          }
+          // For other errors, keep using stored user data
         })
         .finally(() => setIsLoading(false));
     } else {
