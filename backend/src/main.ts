@@ -6,8 +6,16 @@ import {
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module.js';
 import { ConflictExceptionFilter } from './common/filters/conflict-exception.filter.js';
+import { runMigrations } from './database/migrate.js';
 
 async function bootstrap() {
+  // Run migrations before starting the app
+  try {
+    await runMigrations();
+  } catch (error) {
+    console.error('Failed to run migrations:', error);
+    process.exit(1);
+  }
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
     new FastifyAdapter(),
