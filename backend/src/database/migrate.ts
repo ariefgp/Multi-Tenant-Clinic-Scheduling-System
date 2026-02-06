@@ -18,275 +18,208 @@ export async function runMigrations(): Promise<void> {
 
   const sql = neon(databaseUrl);
 
-  // Helper to check if a table exists
-  const tableExists = async (tableName: string): Promise<boolean> => {
-    const result = await sql`
-      SELECT EXISTS (
-        SELECT FROM information_schema.tables
-        WHERE table_schema = 'public'
-        AND table_name = ${tableName}
-      ) as exists
-    `;
-    return result[0]?.exists === true;
-  };
+  // Check if tables exist by querying tenants table
+  const tableCheck = await sql`
+    SELECT EXISTS (
+      SELECT FROM information_schema.tables
+      WHERE table_schema = 'public'
+      AND table_name = 'tenants'
+    ) as exists
+  `;
 
-  console.log('Checking/creating database schema...');
+  if (tableCheck[0]?.exists) {
+    console.log('Database schema already exists, skipping migration');
+    return;
+  }
+
+  console.log('Creating database schema...');
 
   // Enable btree_gist extension for exclusion constraints
   await sql`CREATE EXTENSION IF NOT EXISTS btree_gist`;
 
-  // Create tables incrementally (only if they don't exist)
-  if (!(await tableExists('tenants'))) {
-    console.log('Creating tenants table...');
-    await sql`
-      CREATE TABLE tenants (
-        id BIGSERIAL PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
-        slug VARCHAR(100) NOT NULL UNIQUE,
-        timezone VARCHAR(50) NOT NULL DEFAULT 'UTC',
-        is_active BOOLEAN NOT NULL DEFAULT true,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      )
-    `;
-  }
-
-  // Legacy migration: ensure tenants table has new columns
+  // Create all tables
   await sql`
-    ALTER TABLE tenants
-    ADD COLUMN IF NOT EXISTS slug VARCHAR(100),
-    ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true
-  `;
-  // Add unique constraint on slug if not exists
-  await sql`
-    DO $$
-    BEGIN
-      IF NOT EXISTS (
-        SELECT 1 FROM pg_constraint WHERE conname = 'tenants_slug_unique'
-      ) THEN
-        -- Update existing rows to have unique slugs
-        UPDATE tenants SET slug = 'tenant-' || id WHERE slug IS NULL;
-        -- Add unique constraint
-        ALTER TABLE tenants ADD CONSTRAINT tenants_slug_unique UNIQUE (slug);
-      END IF;
-    END $$
+    CREATE TABLE IF NOT EXISTS tenants (
+      id BIGSERIAL PRIMARY KEY,
+      name VARCHAR(255) NOT NULL,
+      slug VARCHAR(100) NOT NULL UNIQUE,
+      timezone VARCHAR(50) NOT NULL DEFAULT 'UTC',
+      is_active BOOLEAN NOT NULL DEFAULT true,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
   `;
 
-  if (!(await tableExists('doctors'))) {
-    console.log('Creating doctors table...');
-    await sql`
-      CREATE TABLE doctors (
-        id BIGSERIAL PRIMARY KEY,
-        tenant_id BIGINT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-        name VARCHAR(255) NOT NULL,
-        email VARCHAR(255),
-        phone VARCHAR(50),
-        specialty VARCHAR(100),
-        is_active BOOLEAN NOT NULL DEFAULT true,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      )
-    `;
-  } else {
-    // Legacy migration: add phone column if not exists
-    await sql`ALTER TABLE doctors ADD COLUMN IF NOT EXISTS phone VARCHAR(50)`;
-  }
+  await sql`
+    CREATE TABLE IF NOT EXISTS doctors (
+      id BIGSERIAL PRIMARY KEY,
+      tenant_id BIGINT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      name VARCHAR(255) NOT NULL,
+      email VARCHAR(255),
+      phone VARCHAR(50),
+      specialty VARCHAR(100),
+      is_active BOOLEAN NOT NULL DEFAULT true,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
 
-  if (!(await tableExists('patients'))) {
-    console.log('Creating patients table...');
-    await sql`
-      CREATE TABLE patients (
-        id BIGSERIAL PRIMARY KEY,
-        tenant_id BIGINT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-        name VARCHAR(255) NOT NULL,
-        email VARCHAR(255),
-        phone VARCHAR(50),
-        date_of_birth DATE,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      )
-    `;
-  }
+  await sql`
+    CREATE TABLE IF NOT EXISTS patients (
+      id BIGSERIAL PRIMARY KEY,
+      tenant_id BIGINT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      name VARCHAR(255) NOT NULL,
+      email VARCHAR(255),
+      phone VARCHAR(50),
+      date_of_birth DATE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
 
-  if (!(await tableExists('rooms'))) {
-    console.log('Creating rooms table...');
-    await sql`
-      CREATE TABLE rooms (
-        id BIGSERIAL PRIMARY KEY,
-        tenant_id BIGINT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-        name VARCHAR(100) NOT NULL,
-        room_type VARCHAR(50),
-        is_active BOOLEAN NOT NULL DEFAULT true,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      )
-    `;
-  }
+  await sql`
+    CREATE TABLE IF NOT EXISTS rooms (
+      id BIGSERIAL PRIMARY KEY,
+      tenant_id BIGINT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      name VARCHAR(100) NOT NULL,
+      room_type VARCHAR(50),
+      is_active BOOLEAN NOT NULL DEFAULT true,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
 
-  if (!(await tableExists('devices'))) {
-    console.log('Creating devices table...');
-    await sql`
-      CREATE TABLE devices (
-        id BIGSERIAL PRIMARY KEY,
-        tenant_id BIGINT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-        name VARCHAR(100) NOT NULL,
-        device_type VARCHAR(50),
-        is_active BOOLEAN NOT NULL DEFAULT true,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      )
-    `;
-  }
+  await sql`
+    CREATE TABLE IF NOT EXISTS devices (
+      id BIGSERIAL PRIMARY KEY,
+      tenant_id BIGINT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      name VARCHAR(100) NOT NULL,
+      device_type VARCHAR(50),
+      is_active BOOLEAN NOT NULL DEFAULT true,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
 
-  if (!(await tableExists('services'))) {
-    console.log('Creating services table...');
-    await sql`
-      CREATE TABLE services (
-        id BIGSERIAL PRIMARY KEY,
-        tenant_id BIGINT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-        name VARCHAR(255) NOT NULL,
-        duration_minutes INT NOT NULL DEFAULT 30,
-        buffer_before_min INT NOT NULL DEFAULT 0,
-        buffer_after_min INT NOT NULL DEFAULT 0,
-        requires_room BOOLEAN NOT NULL DEFAULT true,
-        color VARCHAR(7),
-        is_active BOOLEAN NOT NULL DEFAULT true,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      )
-    `;
-  }
+  await sql`
+    CREATE TABLE IF NOT EXISTS services (
+      id BIGSERIAL PRIMARY KEY,
+      tenant_id BIGINT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      name VARCHAR(255) NOT NULL,
+      duration_minutes INT NOT NULL DEFAULT 30,
+      buffer_before_min INT NOT NULL DEFAULT 0,
+      buffer_after_min INT NOT NULL DEFAULT 0,
+      requires_room BOOLEAN NOT NULL DEFAULT true,
+      color VARCHAR(7),
+      is_active BOOLEAN NOT NULL DEFAULT true,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
 
-  if (!(await tableExists('service_doctors'))) {
-    console.log('Creating service_doctors table...');
-    await sql`
-      CREATE TABLE service_doctors (
-        service_id BIGINT NOT NULL REFERENCES services(id) ON DELETE CASCADE,
-        doctor_id BIGINT NOT NULL REFERENCES doctors(id) ON DELETE CASCADE,
-        tenant_id BIGINT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-        PRIMARY KEY (service_id, doctor_id)
-      )
-    `;
-  }
+  await sql`
+    CREATE TABLE IF NOT EXISTS service_doctors (
+      service_id BIGINT NOT NULL REFERENCES services(id) ON DELETE CASCADE,
+      doctor_id BIGINT NOT NULL REFERENCES doctors(id) ON DELETE CASCADE,
+      tenant_id BIGINT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      PRIMARY KEY (service_id, doctor_id)
+    )
+  `;
 
-  if (!(await tableExists('service_devices'))) {
-    console.log('Creating service_devices table...');
-    await sql`
-      CREATE TABLE service_devices (
-        service_id BIGINT NOT NULL REFERENCES services(id) ON DELETE CASCADE,
-        device_id BIGINT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
-        tenant_id BIGINT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-        PRIMARY KEY (service_id, device_id)
-      )
-    `;
-  }
+  await sql`
+    CREATE TABLE IF NOT EXISTS service_devices (
+      service_id BIGINT NOT NULL REFERENCES services(id) ON DELETE CASCADE,
+      device_id BIGINT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+      tenant_id BIGINT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      PRIMARY KEY (service_id, device_id)
+    )
+  `;
 
-  if (!(await tableExists('working_hours'))) {
-    console.log('Creating working_hours table...');
-    await sql`
-      CREATE TABLE working_hours (
-        id BIGSERIAL PRIMARY KEY,
-        tenant_id BIGINT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-        doctor_id BIGINT NOT NULL REFERENCES doctors(id) ON DELETE CASCADE,
-        day_of_week SMALLINT NOT NULL CHECK (day_of_week BETWEEN 0 AND 6),
-        start_time TIME NOT NULL,
-        end_time TIME NOT NULL,
-        UNIQUE(doctor_id, day_of_week, start_time)
-      )
-    `;
-  }
+  await sql`
+    CREATE TABLE IF NOT EXISTS working_hours (
+      id BIGSERIAL PRIMARY KEY,
+      tenant_id BIGINT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      doctor_id BIGINT NOT NULL REFERENCES doctors(id) ON DELETE CASCADE,
+      day_of_week SMALLINT NOT NULL CHECK (day_of_week BETWEEN 0 AND 6),
+      start_time TIME NOT NULL,
+      end_time TIME NOT NULL,
+      UNIQUE(doctor_id, day_of_week, start_time)
+    )
+  `;
 
-  if (!(await tableExists('breaks'))) {
-    console.log('Creating breaks table...');
-    await sql`
-      CREATE TABLE breaks (
-        id BIGSERIAL PRIMARY KEY,
-        tenant_id BIGINT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-        doctor_id BIGINT NOT NULL REFERENCES doctors(id) ON DELETE CASCADE,
-        start_time TIMESTAMPTZ NOT NULL,
-        end_time TIMESTAMPTZ NOT NULL,
-        reason VARCHAR(255)
-      )
-    `;
-  }
+  await sql`
+    CREATE TABLE IF NOT EXISTS breaks (
+      id BIGSERIAL PRIMARY KEY,
+      tenant_id BIGINT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      doctor_id BIGINT NOT NULL REFERENCES doctors(id) ON DELETE CASCADE,
+      start_time TIMESTAMPTZ NOT NULL,
+      end_time TIMESTAMPTZ NOT NULL,
+      reason VARCHAR(255)
+    )
+  `;
 
-  if (!(await tableExists('appointments'))) {
-    console.log('Creating appointments table...');
-    await sql`
-      CREATE TABLE appointments (
-        id BIGSERIAL PRIMARY KEY,
-        tenant_id BIGINT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-        doctor_id BIGINT NOT NULL REFERENCES doctors(id),
-        patient_id BIGINT NOT NULL REFERENCES patients(id),
-        service_id BIGINT NOT NULL REFERENCES services(id),
-        room_id BIGINT REFERENCES rooms(id),
-        starts_at TIMESTAMPTZ NOT NULL,
-        ends_at TIMESTAMPTZ NOT NULL,
-        buffer_before INTERVAL NOT NULL DEFAULT '0 minutes',
-        buffer_after INTERVAL NOT NULL DEFAULT '0 minutes',
-        status VARCHAR(20) NOT NULL DEFAULT 'scheduled',
-        notes TEXT,
-        version INT NOT NULL DEFAULT 1,
-        idempotency_key VARCHAR(64) UNIQUE,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      )
-    `;
-  }
+  await sql`
+    CREATE TABLE IF NOT EXISTS appointments (
+      id BIGSERIAL PRIMARY KEY,
+      tenant_id BIGINT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      doctor_id BIGINT NOT NULL REFERENCES doctors(id),
+      patient_id BIGINT NOT NULL REFERENCES patients(id),
+      service_id BIGINT NOT NULL REFERENCES services(id),
+      room_id BIGINT REFERENCES rooms(id),
+      starts_at TIMESTAMPTZ NOT NULL,
+      ends_at TIMESTAMPTZ NOT NULL,
+      buffer_before INTERVAL NOT NULL DEFAULT '0 minutes',
+      buffer_after INTERVAL NOT NULL DEFAULT '0 minutes',
+      status VARCHAR(20) NOT NULL DEFAULT 'scheduled',
+      notes TEXT,
+      version INT NOT NULL DEFAULT 1,
+      idempotency_key VARCHAR(64) UNIQUE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
 
-  if (!(await tableExists('appointment_devices'))) {
-    console.log('Creating appointment_devices table...');
-    await sql`
-      CREATE TABLE appointment_devices (
-        id BIGSERIAL PRIMARY KEY,
-        appointment_id BIGINT NOT NULL REFERENCES appointments(id) ON DELETE CASCADE,
-        device_id BIGINT NOT NULL REFERENCES devices(id),
-        tenant_id BIGINT NOT NULL,
-        starts_at TIMESTAMPTZ NOT NULL,
-        ends_at TIMESTAMPTZ NOT NULL,
-        UNIQUE(appointment_id, device_id)
-      )
-    `;
-  }
+  await sql`
+    CREATE TABLE IF NOT EXISTS appointment_devices (
+      id BIGSERIAL PRIMARY KEY,
+      appointment_id BIGINT NOT NULL REFERENCES appointments(id) ON DELETE CASCADE,
+      device_id BIGINT NOT NULL REFERENCES devices(id),
+      tenant_id BIGINT NOT NULL,
+      starts_at TIMESTAMPTZ NOT NULL,
+      ends_at TIMESTAMPTZ NOT NULL,
+      UNIQUE(appointment_id, device_id)
+    )
+  `;
 
-  if (!(await tableExists('appointment_audit_log'))) {
-    console.log('Creating appointment_audit_log table...');
-    await sql`
-      CREATE TABLE appointment_audit_log (
-        id BIGSERIAL PRIMARY KEY,
-        tenant_id BIGINT NOT NULL,
-        appointment_id BIGINT NOT NULL,
-        action VARCHAR(20) NOT NULL,
-        changes JSONB,
-        performed_by VARCHAR(100),
-        performed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      )
-    `;
-  }
+  await sql`
+    CREATE TABLE IF NOT EXISTS appointment_audit_log (
+      id BIGSERIAL PRIMARY KEY,
+      tenant_id BIGINT NOT NULL,
+      appointment_id BIGINT NOT NULL,
+      action VARCHAR(20) NOT NULL,
+      changes JSONB,
+      performed_by VARCHAR(100),
+      performed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
 
-  if (!(await tableExists('users'))) {
-    console.log('Creating users table...');
-    await sql`
-      CREATE TABLE users (
-        id BIGSERIAL PRIMARY KEY,
-        tenant_id BIGINT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-        email VARCHAR(255) NOT NULL UNIQUE,
-        google_id VARCHAR(255) UNIQUE,
-        name VARCHAR(255) NOT NULL,
-        picture VARCHAR(512),
-        role VARCHAR(50) NOT NULL DEFAULT 'staff',
-        is_active BOOLEAN NOT NULL DEFAULT true,
-        last_login_at TIMESTAMPTZ,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      )
-    `;
-  }
+  await sql`
+    CREATE TABLE IF NOT EXISTS users (
+      id BIGSERIAL PRIMARY KEY,
+      tenant_id BIGINT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      email VARCHAR(255) NOT NULL UNIQUE,
+      google_id VARCHAR(255) UNIQUE,
+      name VARCHAR(255) NOT NULL,
+      picture VARCHAR(512),
+      role VARCHAR(50) NOT NULL DEFAULT 'staff',
+      is_active BOOLEAN NOT NULL DEFAULT true,
+      last_login_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
 
-  console.log('All tables created/verified');
-
-  // Create indexes (IF NOT EXISTS handles idempotency)
-  console.log('Creating indexes...');
+  // Create indexes
   await sql`CREATE INDEX IF NOT EXISTS idx_doctors_tenant ON doctors(tenant_id)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_patients_tenant ON patients(tenant_id)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_rooms_tenant ON rooms(tenant_id)`;
@@ -303,6 +236,8 @@ export async function runMigrations(): Promise<void> {
   await sql`CREATE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_audit_appointment ON appointment_audit_log(appointment_id)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_audit_tenant_time ON appointment_audit_log(tenant_id, performed_at DESC)`;
+
+  console.log('Database schema created successfully');
 
   // Create exclusion constraints for race condition prevention
   console.log('Creating exclusion constraints...');
@@ -509,47 +444,8 @@ export async function runMigrations(): Promise<void> {
 
     console.log('Seed data inserted successfully');
   } else {
-    console.log('Seed data already exists, checking for missing data...');
-
-    // Check if service_doctors has data for tenant 1 (could be missing if table was just created)
-    const serviceDoctorsCheck = await sql`SELECT COUNT(*) as count FROM service_doctors WHERE tenant_id = 1`;
-    if (Number(serviceDoctorsCheck[0]?.count) === 0) {
-      console.log('Inserting service_doctors seed data...');
-      await sql`
-        INSERT INTO service_doctors (service_id, doctor_id, tenant_id) VALUES
-        (1, 1, 1), (1, 2, 1), (1, 3, 1),
-        (2, 1, 1), (2, 2, 1), (2, 3, 1),
-        (3, 1, 1), (3, 2, 1),
-        (4, 1, 1), (4, 3, 1)
-        ON CONFLICT DO NOTHING
-      `;
-    }
-
-    // Check if working_hours has data for tenant 1 (could be missing if table was just created)
-    const workingHoursCheck = await sql`SELECT COUNT(*) as count FROM working_hours WHERE tenant_id = 1`;
-    if (Number(workingHoursCheck[0]?.count) === 0) {
-      console.log('Inserting working_hours seed data...');
-      await sql`
-        INSERT INTO working_hours (tenant_id, doctor_id, day_of_week, start_time, end_time) VALUES
-        (1, 1, 1, '09:00', '12:00'), (1, 1, 1, '14:00', '17:00'),
-        (1, 1, 2, '09:00', '12:00'), (1, 1, 2, '14:00', '17:00'),
-        (1, 1, 3, '09:00', '12:00'), (1, 1, 3, '14:00', '17:00'),
-        (1, 1, 4, '09:00', '12:00'), (1, 1, 4, '14:00', '17:00'),
-        (1, 1, 5, '09:00', '12:00'),
-        (1, 2, 1, '08:00', '15:00'),
-        (1, 2, 2, '08:00', '15:00'),
-        (1, 2, 3, '08:00', '15:00'),
-        (1, 2, 4, '08:00', '15:00'),
-        (1, 2, 5, '08:00', '15:00'),
-        (1, 3, 1, '10:00', '18:00'),
-        (1, 3, 3, '10:00', '18:00'),
-        (1, 3, 5, '10:00', '18:00')
-        ON CONFLICT DO NOTHING
-      `;
-    }
+    console.log('Seed data already exists, skipping');
   }
-
-  console.log('Migration completed successfully');
 }
 
 // Run directly if called as script
