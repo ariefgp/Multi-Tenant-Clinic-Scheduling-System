@@ -46,7 +46,7 @@ export class AuthController {
     googleAuthUrl.searchParams.set('access_type', 'offline');
     googleAuthUrl.searchParams.set('prompt', 'consent');
 
-    return res.redirect(302, googleAuthUrl.toString());
+    return res.code(302).redirect(googleAuthUrl.toString());
   }
 
   @Get('google/callback')
@@ -62,13 +62,13 @@ export class AuthController {
     if (error) {
       const errorUrl = new URL('/auth/callback', frontendUrl);
       errorUrl.searchParams.set('error', error);
-      return res.redirect(302, errorUrl.toString());
+      return res.code(302).redirect(errorUrl.toString());
     }
 
     if (!code) {
       const errorUrl = new URL('/auth/callback', frontendUrl);
       errorUrl.searchParams.set('error', 'No authorization code received');
-      return res.redirect(302, errorUrl.toString());
+      return res.code(302).redirect(errorUrl.toString());
     }
 
     try {
@@ -99,12 +99,12 @@ export class AuthController {
       );
       callbackUrl.searchParams.set('data', authData);
 
-      return res.redirect(302, callbackUrl.toString());
+      return res.code(302).redirect(callbackUrl.toString());
     } catch (err) {
       console.error('Google OAuth error:', err);
       const errorUrl = new URL('/auth/callback', frontendUrl);
       errorUrl.searchParams.set('error', 'Authentication failed');
-      return res.redirect(302, errorUrl.toString());
+      return res.code(302).redirect(errorUrl.toString());
     }
   }
 
