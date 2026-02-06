@@ -20,7 +20,10 @@ import {
   patients,
   rooms,
 } from '../../database/schema/index.js';
-import { ConflictCheckerService } from './services/conflict-checker.service.js';
+import {
+  ConflictCheckerService,
+  type Conflict,
+} from './services/conflict-checker.service.js';
 import type { CreateAppointmentDto } from './dto/create-appointment.dto.js';
 import type { RescheduleAppointmentDto } from './dto/reschedule-appointment.dto.js';
 
@@ -57,7 +60,7 @@ export class AppointmentService {
     if (conflicts.length > 0) {
       throw new ConflictException({
         error: 'scheduling_conflict',
-        message: 'The requested time slot conflicts with existing appointments',
+        message: this.buildConflictMessage(conflicts),
         conflicts,
       });
     }
@@ -115,7 +118,7 @@ export class AppointmentService {
         });
         throw new ConflictException({
           error: 'scheduling_conflict',
-          message: 'Scheduling conflict detected (concurrent booking)',
+          message: this.buildConflictMessage(freshConflicts),
           conflicts: freshConflicts,
         });
       }
@@ -217,7 +220,7 @@ export class AppointmentService {
     if (conflicts.length > 0) {
       throw new ConflictException({
         error: 'scheduling_conflict',
-        message: 'The new time slot conflicts with existing appointments',
+        message: this.buildConflictMessage(conflicts),
         conflicts,
       });
     }
@@ -283,7 +286,7 @@ export class AppointmentService {
         });
         throw new ConflictException({
           error: 'scheduling_conflict',
-          message: 'Scheduling conflict detected (concurrent reschedule)',
+          message: this.buildConflictMessage(freshConflicts),
           conflicts: freshConflicts,
         });
       }
@@ -396,5 +399,30 @@ export class AppointmentService {
       throw new NotFoundException('Service not found');
     }
     return service;
+  }
+
+  private buildConflictMessage(conflicts: Conflict[]): string {
+    if (conflicts.length === 0) {
+      return 'Scheduling conflict detected';
+    }
+
+    const resourceMessages = conflicts.map((c) => {
+      const type =
+        c.resourceType === 'doctor'
+          ? 'Doctor'
+          : c.resourceType === 'room'
+            ? 'Room'
+            : 'Device';
+      return `${type} "${c.resourceName}"`;
+    });
+
+    const uniqueMessages = [...new Set(resourceMessages)];
+
+    if (uniqueMessages.length === 1) {
+      return `${uniqueMessages[0]} is unavailable at the requested time`;
+    }
+
+    const last = uniqueMessages.pop();
+    return `${uniqueMessages.join(', ')} and ${last} are unavailable at the requested time`;
   }
 }
