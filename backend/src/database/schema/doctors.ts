@@ -18,6 +18,7 @@ export const doctors = pgTable(
       .references(() => tenants.id, { onDelete: 'cascade' }),
     name: varchar({ length: 255 }).notNull(),
     email: varchar({ length: 255 }),
+    phone: varchar({ length: 50 }),
     specialty: varchar({ length: 100 }),
     isActive: boolean('is_active').notNull().default(true),
     createdAt: timestamp('created_at', { withTimezone: true })

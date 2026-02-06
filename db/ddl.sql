@@ -22,6 +22,7 @@ CREATE TABLE doctors (
     tenant_id       BIGINT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     name            VARCHAR(255) NOT NULL,
     email           VARCHAR(255),
+    phone           VARCHAR(50),
     specialty       VARCHAR(100),
     is_active       BOOLEAN NOT NULL DEFAULT true,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
