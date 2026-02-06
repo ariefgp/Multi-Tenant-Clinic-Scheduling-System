@@ -116,19 +116,19 @@ export async function runMigrations(): Promise<void> {
 
   await sql`
     CREATE TABLE IF NOT EXISTS service_doctors (
-      id BIGSERIAL PRIMARY KEY,
       service_id BIGINT NOT NULL REFERENCES services(id) ON DELETE CASCADE,
       doctor_id BIGINT NOT NULL REFERENCES doctors(id) ON DELETE CASCADE,
-      UNIQUE(service_id, doctor_id)
+      tenant_id BIGINT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      PRIMARY KEY (service_id, doctor_id)
     )
   `;
 
   await sql`
     CREATE TABLE IF NOT EXISTS service_devices (
-      id BIGSERIAL PRIMARY KEY,
       service_id BIGINT NOT NULL REFERENCES services(id) ON DELETE CASCADE,
       device_id BIGINT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
-      UNIQUE(service_id, device_id)
+      tenant_id BIGINT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      PRIMARY KEY (service_id, device_id)
     )
   `;
 
@@ -234,6 +234,80 @@ export async function runMigrations(): Promise<void> {
 
   console.log('Database schema created successfully');
 
+  // Enable Row Level Security
+  console.log('Enabling Row Level Security...');
+
+  await sql`ALTER TABLE doctors ENABLE ROW LEVEL SECURITY`;
+  await sql`ALTER TABLE patients ENABLE ROW LEVEL SECURITY`;
+  await sql`ALTER TABLE rooms ENABLE ROW LEVEL SECURITY`;
+  await sql`ALTER TABLE devices ENABLE ROW LEVEL SECURITY`;
+  await sql`ALTER TABLE services ENABLE ROW LEVEL SECURITY`;
+  await sql`ALTER TABLE service_doctors ENABLE ROW LEVEL SECURITY`;
+  await sql`ALTER TABLE service_devices ENABLE ROW LEVEL SECURITY`;
+  await sql`ALTER TABLE working_hours ENABLE ROW LEVEL SECURITY`;
+  await sql`ALTER TABLE breaks ENABLE ROW LEVEL SECURITY`;
+  await sql`ALTER TABLE appointments ENABLE ROW LEVEL SECURITY`;
+  await sql`ALTER TABLE appointment_devices ENABLE ROW LEVEL SECURITY`;
+  await sql`ALTER TABLE appointment_audit_log ENABLE ROW LEVEL SECURITY`;
+  await sql`ALTER TABLE users ENABLE ROW LEVEL SECURITY`;
+
+  // Create RLS policies using tenant_id column
+  // Note: These policies use current_setting('app.current_tenant') which must be set per-request
+  await sql`
+    CREATE POLICY IF NOT EXISTS tenant_isolation_doctors ON doctors
+    USING (tenant_id = current_setting('app.current_tenant', true)::BIGINT)
+  `;
+  await sql`
+    CREATE POLICY IF NOT EXISTS tenant_isolation_patients ON patients
+    USING (tenant_id = current_setting('app.current_tenant', true)::BIGINT)
+  `;
+  await sql`
+    CREATE POLICY IF NOT EXISTS tenant_isolation_rooms ON rooms
+    USING (tenant_id = current_setting('app.current_tenant', true)::BIGINT)
+  `;
+  await sql`
+    CREATE POLICY IF NOT EXISTS tenant_isolation_devices ON devices
+    USING (tenant_id = current_setting('app.current_tenant', true)::BIGINT)
+  `;
+  await sql`
+    CREATE POLICY IF NOT EXISTS tenant_isolation_services ON services
+    USING (tenant_id = current_setting('app.current_tenant', true)::BIGINT)
+  `;
+  await sql`
+    CREATE POLICY IF NOT EXISTS tenant_isolation_service_doctors ON service_doctors
+    USING (tenant_id = current_setting('app.current_tenant', true)::BIGINT)
+  `;
+  await sql`
+    CREATE POLICY IF NOT EXISTS tenant_isolation_service_devices ON service_devices
+    USING (tenant_id = current_setting('app.current_tenant', true)::BIGINT)
+  `;
+  await sql`
+    CREATE POLICY IF NOT EXISTS tenant_isolation_working_hours ON working_hours
+    USING (tenant_id = current_setting('app.current_tenant', true)::BIGINT)
+  `;
+  await sql`
+    CREATE POLICY IF NOT EXISTS tenant_isolation_breaks ON breaks
+    USING (tenant_id = current_setting('app.current_tenant', true)::BIGINT)
+  `;
+  await sql`
+    CREATE POLICY IF NOT EXISTS tenant_isolation_appointments ON appointments
+    USING (tenant_id = current_setting('app.current_tenant', true)::BIGINT)
+  `;
+  await sql`
+    CREATE POLICY IF NOT EXISTS tenant_isolation_appointment_devices ON appointment_devices
+    USING (tenant_id = current_setting('app.current_tenant', true)::BIGINT)
+  `;
+  await sql`
+    CREATE POLICY IF NOT EXISTS tenant_isolation_audit ON appointment_audit_log
+    USING (tenant_id = current_setting('app.current_tenant', true)::BIGINT)
+  `;
+  await sql`
+    CREATE POLICY IF NOT EXISTS tenant_isolation_users ON users
+    USING (tenant_id = current_setting('app.current_tenant', true)::BIGINT)
+  `;
+
+  console.log('Row Level Security enabled');
+
   // Insert seed data
   console.log('Inserting seed data...');
 
@@ -283,11 +357,11 @@ export async function runMigrations(): Promise<void> {
     `;
 
     await sql`
-      INSERT INTO service_doctors (service_id, doctor_id) VALUES
-      (1, 1), (1, 2), (1, 3),
-      (2, 1), (2, 2), (2, 3),
-      (3, 1), (3, 2),
-      (4, 1), (4, 3)
+      INSERT INTO service_doctors (service_id, doctor_id, tenant_id) VALUES
+      (1, 1, 1), (1, 2, 1), (1, 3, 1),
+      (2, 1, 1), (2, 2, 1), (2, 3, 1),
+      (3, 1, 1), (3, 2, 1),
+      (4, 1, 1), (4, 3, 1)
     `;
 
     await sql`
