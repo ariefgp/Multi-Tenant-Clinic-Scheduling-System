@@ -107,26 +107,25 @@ CREATE TABLE working_hours (
     id              BIGSERIAL PRIMARY KEY,
     tenant_id       BIGINT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     doctor_id       BIGINT NOT NULL REFERENCES doctors(id) ON DELETE CASCADE,
-    weekday         SMALLINT NOT NULL CHECK (weekday BETWEEN 0 AND 6),
+    day_of_week     SMALLINT NOT NULL CHECK (day_of_week BETWEEN 0 AND 6),
     start_time      TIME NOT NULL,
     end_time        TIME NOT NULL,
     CHECK (start_time < end_time)
 );
 
-CREATE INDEX idx_working_hours_doctor_day ON working_hours(tenant_id, doctor_id, weekday);
+CREATE INDEX idx_working_hours_doctor_day ON working_hours(tenant_id, doctor_id, day_of_week);
 
 CREATE TABLE breaks (
     id              BIGSERIAL PRIMARY KEY,
     tenant_id       BIGINT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-    resource_type   VARCHAR(20) NOT NULL CHECK (resource_type IN ('doctor', 'room', 'device')),
-    resource_id     BIGINT NOT NULL,
-    starts_at       TIMESTAMPTZ NOT NULL,
-    ends_at         TIMESTAMPTZ NOT NULL,
+    doctor_id       BIGINT NOT NULL REFERENCES doctors(id) ON DELETE CASCADE,
+    start_time      TIMESTAMPTZ NOT NULL,
+    end_time        TIMESTAMPTZ NOT NULL,
     reason          VARCHAR(255),
-    CHECK (starts_at < ends_at)
+    CHECK (start_time < end_time)
 );
 
-CREATE INDEX idx_breaks_resource ON breaks(tenant_id, resource_type, resource_id, starts_at);
+CREATE INDEX idx_breaks_doctor ON breaks(doctor_id, start_time);
 
 -- ============================================
 -- APPOINTMENTS
