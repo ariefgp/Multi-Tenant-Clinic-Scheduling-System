@@ -1,22 +1,9 @@
-import { useMemo } from 'react';
-import {
-  startOfWeek,
-  endOfWeek,
-  eachDayOfInterval,
-  format,
-  isSameDay,
-  isToday,
-  differenceInMinutes,
-  setHours,
-  setMinutes,
-} from 'date-fns';
-import { cn } from '../lib/utils.ts';
-import { Badge } from './ui/badge.tsx';
+import { useRef, useEffect } from 'react';
+import FullCalendar from '@fullcalendar/react';
+import timeGridPlugin from '@fullcalendar/timegrid';
+import interactionPlugin from '@fullcalendar/interaction';
+import type { EventClickArg, DateClickArg } from '@fullcalendar/core';
 import type { Appointment } from '../types/index.ts';
-
-const HOUR_START = 7;
-const HOUR_END = 19;
-const HOUR_HEIGHT = 64;
 
 interface WeekCalendarProps {
   currentDate: Date;
@@ -25,12 +12,12 @@ interface WeekCalendarProps {
   onAppointmentClick: (appointment: Appointment) => void;
 }
 
-const statusVariantMap: Record<string, 'default' | 'success' | 'warning' | 'destructive'> = {
-  scheduled: 'default',
-  confirmed: 'success',
-  cancelled: 'destructive',
-  completed: 'success',
-  'no-show': 'warning',
+const statusColorMap: Record<string, string> = {
+  scheduled: '#6B7280',
+  confirmed: '#10B981',
+  cancelled: '#EF4444',
+  completed: '#22C55E',
+  'no-show': '#F59E0B',
 };
 
 export function WeekCalendar({
@@ -39,121 +26,55 @@ export function WeekCalendar({
   onSlotClick,
   onAppointmentClick,
 }: WeekCalendarProps) {
-  const weekDays = useMemo(() => {
-    const start = startOfWeek(currentDate, { weekStartsOn: 1 });
-    const end = endOfWeek(currentDate, { weekStartsOn: 1 });
-    return eachDayOfInterval({ start, end });
+  const calendarRef = useRef<FullCalendar>(null);
+
+  useEffect(() => {
+    if (calendarRef.current) {
+      calendarRef.current.getApi().gotoDate(currentDate);
+    }
   }, [currentDate]);
 
-  const hours = useMemo(
-    () => Array.from({ length: HOUR_END - HOUR_START }, (_, i) => i + HOUR_START),
-    [],
-  );
+  const events = appointments.map((apt) => ({
+    id: String(apt.id),
+    title: `${apt.patientName} - ${apt.serviceName}`,
+    start: apt.startsAt,
+    end: apt.endsAt,
+    backgroundColor: apt.serviceColor ?? '#3B82F6',
+    borderColor: statusColorMap[apt.status] ?? '#6B7280',
+    extendedProps: { appointment: apt },
+  }));
 
-  const getAppointmentsForDay = (day: Date) =>
-    appointments.filter((apt) => isSameDay(new Date(apt.startsAt), day));
+  const handleEventClick = (info: EventClickArg) => {
+    const apt = info.event.extendedProps.appointment as Appointment;
+    onAppointmentClick(apt);
+  };
 
-  const getAppointmentStyle = (apt: Appointment) => {
-    const start = new Date(apt.startsAt);
-    const end = new Date(apt.endsAt);
-    const dayStart = setMinutes(setHours(start, HOUR_START), 0);
-    const topMinutes = differenceInMinutes(start, dayStart);
-    const durationMinutes = differenceInMinutes(end, start);
-
-    return {
-      top: `${(topMinutes / 60) * HOUR_HEIGHT}px`,
-      height: `${Math.max((durationMinutes / 60) * HOUR_HEIGHT - 2, 20)}px`,
-      backgroundColor: apt.serviceColor ?? '#3B82F6',
-    };
+  const handleDateClick = (info: DateClickArg) => {
+    onSlotClick(info.date);
   };
 
   return (
-    <div className="flex h-full flex-col">
-      {/* Header */}
-      <div className="sticky top-0 z-10 grid grid-cols-[64px_repeat(7,1fr)] border-b bg-white">
-        <div className="p-2" />
-        {weekDays.map((day) => (
-          <div
-            key={day.toISOString()}
-            className={cn(
-              'border-l p-2 text-center',
-              isToday(day) && 'bg-blue-50',
-            )}
-          >
-            <div className="text-xs uppercase text-gray-500">
-              {format(day, 'EEE')}
-            </div>
-            <div
-              className={cn(
-                'text-lg font-semibold',
-                isToday(day) && 'text-blue-600',
-              )}
-            >
-              {format(day, 'd')}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Time grid */}
-      <div className="flex-1 overflow-auto">
-        <div className="relative grid grid-cols-[64px_repeat(7,1fr)]">
-          {hours.map((hour) => (
-            <div key={`row-${hour}`} className="contents">
-              <div
-                className="border-r pr-2 pt-0 text-right text-xs text-gray-400"
-                style={{ height: `${HOUR_HEIGHT}px` }}
-              >
-                {format(setHours(new Date(), hour), 'h a')}
-              </div>
-              {weekDays.map((day) => {
-                const dayAppts =
-                  hour === HOUR_START ? getAppointmentsForDay(day) : [];
-
-                return (
-                  <div
-                    key={`${day.toISOString()}-${hour}`}
-                    className="relative cursor-pointer border-b border-l hover:bg-blue-50/50"
-                    style={{ height: `${HOUR_HEIGHT}px` }}
-                    onClick={() => {
-                      const clickDate = setMinutes(setHours(new Date(day), hour), 0);
-                      onSlotClick(clickDate);
-                    }}
-                  >
-                    {hour === HOUR_START &&
-                      dayAppts.map((apt) => (
-                        <div
-                          key={apt.id}
-                          className="absolute inset-x-1 z-10 cursor-pointer overflow-hidden rounded px-1.5 py-0.5 text-xs text-white transition-opacity hover:opacity-90"
-                          style={getAppointmentStyle(apt)}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onAppointmentClick(apt);
-                          }}
-                        >
-                          <div className="flex items-center justify-between gap-1">
-                            <span className="truncate font-medium">
-                              {apt.patientName}
-                            </span>
-                            <Badge
-                              variant={statusVariantMap[apt.status] ?? 'default'}
-                              className="h-4 shrink-0 px-1 text-[10px]"
-                            >
-                              {apt.status}
-                            </Badge>
-                          </div>
-                          <div className="truncate opacity-80">
-                            {apt.serviceName}
-                          </div>
-                        </div>
-                      ))}
-                  </div>
-                );
-              })}
-            </div>
-          ))}
-        </div>
-      </div>
+    <div className="h-full [&_.fc]:h-full [&_.fc-timegrid-slot]:h-16 [&_.fc-col-header-cell]:py-2 [&_.fc-timegrid-axis]:w-16 [&_.fc-scrollgrid]:border-0 [&_.fc-theme-standard_td]:border-gray-200 [&_.fc-theme-standard_th]:border-gray-200 [&_.fc-day-today]:bg-blue-50/50 [&_.fc-timegrid-event]:rounded [&_.fc-timegrid-event]:px-1.5 [&_.fc-event-title]:text-xs [&_.fc-event-title]:font-medium [&_.fc-toolbar]:hidden">
+      <FullCalendar
+        ref={calendarRef}
+        plugins={[timeGridPlugin, interactionPlugin]}
+        initialView="timeGridWeek"
+        initialDate={currentDate}
+        headerToolbar={false}
+        slotMinTime="07:00:00"
+        slotMaxTime="19:00:00"
+        slotDuration="01:00:00"
+        allDaySlot={false}
+        weekends={true}
+        firstDay={1}
+        events={events}
+        eventClick={handleEventClick}
+        dateClick={handleDateClick}
+        height="100%"
+        nowIndicator={true}
+        dayHeaderFormat={{ weekday: 'short', day: 'numeric' }}
+        slotLabelFormat={{ hour: 'numeric', meridiem: 'short' }}
+      />
     </div>
   );
 }
