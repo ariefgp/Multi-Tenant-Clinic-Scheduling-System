@@ -5,7 +5,7 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
-import { eq, and, ne, gte, lte, sql } from 'drizzle-orm';
+import { eq, and, ne, gte, lte, sql, inArray } from 'drizzle-orm';
 import { addMinutes } from 'date-fns';
 import {
   DATABASE_CONNECTION,
@@ -16,9 +16,13 @@ import {
   appointmentDevices,
   appointmentAuditLog,
   services,
+  serviceDoctors,
+  serviceDevices,
   doctors,
   patients,
   rooms,
+  workingHours,
+  breaks,
 } from '../../database/schema/index.js';
 import {
   ConflictCheckerService,
@@ -45,6 +49,35 @@ export class AppointmentService {
 
     const startsAt = new Date(dto.starts_at);
     const endsAt = addMinutes(startsAt, service.durationMinutes);
+
+    // Validate doctor supports this service
+    await this.validateDoctorSupportsService(
+      tenantId,
+      dto.doctor_id,
+      dto.service_id,
+    );
+
+    // Validate appointment is within doctor's working hours
+    await this.validateWorkingHours(
+      tenantId,
+      dto.doctor_id,
+      startsAt,
+      endsAt,
+    );
+
+    // Validate no break overlap
+    await this.validateNoBreakOverlap(
+      tenantId,
+      dto.doctor_id,
+      startsAt,
+      endsAt,
+    );
+
+    // Validate required devices are provided
+    await this.validateRequiredDevices(
+      dto.service_id,
+      dto.device_ids,
+    );
 
     const conflicts = await this.conflictChecker.findConflicts({
       tenantId,
@@ -204,6 +237,26 @@ export class AppointmentService {
 
     const startsAt = new Date(dto.starts_at);
     const endsAt = addMinutes(startsAt, service.durationMinutes);
+
+    // Validate doctor supports this service (if doctor changed)
+    if (dto.doctor_id && dto.doctor_id !== existing.doctorId) {
+      await this.validateDoctorSupportsService(
+        tenantId,
+        doctorId,
+        existing.serviceId,
+      );
+    }
+
+    // Validate appointment is within doctor's working hours
+    await this.validateWorkingHours(tenantId, doctorId, startsAt, endsAt);
+
+    // Validate no break overlap
+    await this.validateNoBreakOverlap(tenantId, doctorId, startsAt, endsAt);
+
+    // Validate required devices are provided (if devices changed)
+    if (deviceIds !== undefined) {
+      await this.validateRequiredDevices(existing.serviceId, deviceIds);
+    }
 
     const conflicts = await this.conflictChecker.findConflicts({
       tenantId,
@@ -424,5 +477,147 @@ export class AppointmentService {
 
     const last = uniqueMessages.pop();
     return `${uniqueMessages.join(', ')} and ${last} are unavailable at the requested time`;
+  }
+
+  private async validateDoctorSupportsService(
+    tenantId: number,
+    doctorId: number,
+    serviceId: number,
+  ): Promise<void> {
+    const [assignment] = await this.db
+      .select()
+      .from(serviceDoctors)
+      .where(
+        and(
+          eq(serviceDoctors.tenantId, tenantId),
+          eq(serviceDoctors.serviceId, serviceId),
+          eq(serviceDoctors.doctorId, doctorId),
+        ),
+      );
+
+    if (!assignment) {
+      const [doctor] = await this.db
+        .select({ name: doctors.name })
+        .from(doctors)
+        .where(eq(doctors.id, doctorId));
+
+      const [service] = await this.db
+        .select({ name: services.name })
+        .from(services)
+        .where(eq(services.id, serviceId));
+
+      throw new BadRequestException(
+        `Doctor "${doctor?.name ?? doctorId}" is not assigned to service "${service?.name ?? serviceId}"`,
+      );
+    }
+  }
+
+  private async validateWorkingHours(
+    tenantId: number,
+    doctorId: number,
+    startsAt: Date,
+    endsAt: Date,
+  ): Promise<void> {
+    const dayOfWeek = startsAt.getUTCDay(); // 0 = Sunday, 1 = Monday, etc.
+
+    const hours = await this.db
+      .select()
+      .from(workingHours)
+      .where(
+        and(
+          eq(workingHours.tenantId, tenantId),
+          eq(workingHours.doctorId, doctorId),
+          eq(workingHours.dayOfWeek, dayOfWeek),
+        ),
+      );
+
+    if (hours.length === 0) {
+      const dayNames = [
+        'Sunday',
+        'Monday',
+        'Tuesday',
+        'Wednesday',
+        'Thursday',
+        'Friday',
+        'Saturday',
+      ];
+      throw new BadRequestException(
+        `Doctor does not work on ${dayNames[dayOfWeek]}`,
+      );
+    }
+
+    // Check if the appointment fits within any working hour block
+    const startTime = this.formatTimeFromDate(startsAt);
+    const endTime = this.formatTimeFromDate(endsAt);
+
+    const fitsInWorkingHours = hours.some((wh) => {
+      return startTime >= wh.startTime && endTime <= wh.endTime;
+    });
+
+    if (!fitsInWorkingHours) {
+      const availableHours = hours
+        .map((wh) => `${wh.startTime}-${wh.endTime}`)
+        .join(', ');
+      throw new BadRequestException(
+        `Appointment time ${startTime}-${endTime} is outside doctor's working hours (${availableHours})`,
+      );
+    }
+  }
+
+  private async validateNoBreakOverlap(
+    tenantId: number,
+    doctorId: number,
+    startsAt: Date,
+    endsAt: Date,
+  ): Promise<void> {
+    const overlappingBreaks = await this.db
+      .select()
+      .from(breaks)
+      .where(
+        and(
+          eq(breaks.tenantId, tenantId),
+          eq(breaks.doctorId, doctorId),
+          lte(breaks.startTime, endsAt),
+          gte(breaks.endTime, startsAt),
+        ),
+      );
+
+    if (overlappingBreaks.length > 0) {
+      const breakInfo = overlappingBreaks[0];
+      throw new BadRequestException(
+        `Appointment overlaps with doctor's break${breakInfo.reason ? ` (${breakInfo.reason})` : ''}`,
+      );
+    }
+  }
+
+  private async validateRequiredDevices(
+    serviceId: number,
+    providedDeviceIds: number[],
+  ): Promise<void> {
+    const requiredDevices = await this.db
+      .select({ deviceId: serviceDevices.deviceId })
+      .from(serviceDevices)
+      .where(eq(serviceDevices.serviceId, serviceId));
+
+    if (requiredDevices.length === 0) {
+      return; // No devices required for this service
+    }
+
+    const requiredIds = requiredDevices.map((d) => d.deviceId);
+    const missingDevices = requiredIds.filter(
+      (id) => !providedDeviceIds.includes(id),
+    );
+
+    if (missingDevices.length > 0) {
+      throw new BadRequestException(
+        `Service requires device(s) that were not provided: ${missingDevices.join(', ')}`,
+      );
+    }
+  }
+
+  private formatTimeFromDate(date: Date): string {
+    const hours = date.getUTCHours().toString().padStart(2, '0');
+    const minutes = date.getUTCMinutes().toString().padStart(2, '0');
+    return `${hours}:${minutes}`;
   }
 }

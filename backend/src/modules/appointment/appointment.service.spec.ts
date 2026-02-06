@@ -51,8 +51,18 @@ describe('AppointmentService', () => {
     updatedAt: new Date(),
   };
 
+  const mockServiceDoctor = { serviceId: 1, doctorId: 101, tenantId: 1 };
+  const mockWorkingHours = {
+    id: 1,
+    tenantId: 1,
+    doctorId: 101,
+    dayOfWeek: 2, // Tuesday (2026-02-10 is a Tuesday)
+    startTime: '09:00',
+    endTime: '17:00',
+  };
+
   const createMockQuery = (results: unknown[] = []) => {
-    return {
+    const mockQuery = {
       from: jest.fn().mockReturnThis(),
       innerJoin: jest.fn().mockReturnThis(),
       leftJoin: jest.fn().mockReturnThis(),
@@ -61,7 +71,23 @@ describe('AppointmentService', () => {
       values: jest.fn().mockReturnThis(),
       set: jest.fn().mockReturnThis(),
       returning: jest.fn().mockResolvedValue(results),
+      // Make the query itself thenable/awaitable to return results for SELECT
+      then: (resolve: (value: unknown[]) => void) => resolve(results),
     };
+    return mockQuery;
+  };
+
+  // Helper to setup all validation mocks for create/reschedule
+  const setupValidationMocks = () => {
+    // 1. Service lookup (already in test)
+    // 2. Doctor supports service
+    mockDb.select.mockReturnValueOnce(createMockQuery([mockServiceDoctor]));
+    // 3. Working hours
+    mockDb.select.mockReturnValueOnce(createMockQuery([mockWorkingHours]));
+    // 4. No breaks
+    mockDb.select.mockReturnValueOnce(createMockQuery([]));
+    // 5. Required devices (no required devices)
+    mockDb.select.mockReturnValueOnce(createMockQuery([]));
   };
 
   beforeEach(async () => {
@@ -110,6 +136,9 @@ describe('AppointmentService', () => {
       // Mock service lookup
       mockDb.select.mockReturnValueOnce(createMockQuery([mockService]));
 
+      // Setup validation mocks
+      setupValidationMocks();
+
       // Mock no conflicts
       conflictChecker.findConflicts.mockResolvedValueOnce([]);
 
@@ -128,6 +157,9 @@ describe('AppointmentService', () => {
     it('should throw ConflictException when conflicts exist', async () => {
       // Mock service lookup
       mockDb.select.mockReturnValueOnce(createMockQuery([mockService]));
+
+      // Setup validation mocks
+      setupValidationMocks();
 
       // Mock conflicts found
       conflictChecker.findConflicts.mockResolvedValueOnce([
@@ -174,6 +206,9 @@ describe('AppointmentService', () => {
     it('should handle database exclusion constraint violation (race condition)', async () => {
       // Mock service lookup
       mockDb.select.mockReturnValueOnce(createMockQuery([mockService]));
+
+      // Setup validation mocks
+      setupValidationMocks();
 
       // Mock no conflicts on first check
       conflictChecker.findConflicts.mockResolvedValueOnce([]);
@@ -243,6 +278,12 @@ describe('AppointmentService', () => {
       // Mock service lookup
       mockDb.select.mockReturnValueOnce(createMockQuery([mockService]));
 
+      // Validation mocks (no doctor change, so no service_doctors check)
+      // Working hours
+      mockDb.select.mockReturnValueOnce(createMockQuery([mockWorkingHours]));
+      // No breaks
+      mockDb.select.mockReturnValueOnce(createMockQuery([]));
+
       // Mock no conflicts
       conflictChecker.findConflicts.mockResolvedValueOnce([]);
 
@@ -292,6 +333,10 @@ describe('AppointmentService', () => {
 
       // Mock service lookup
       mockDb.select.mockReturnValueOnce(createMockQuery([mockService]));
+
+      // Validation mocks
+      mockDb.select.mockReturnValueOnce(createMockQuery([mockWorkingHours]));
+      mockDb.select.mockReturnValueOnce(createMockQuery([]));
 
       // Mock conflicts found
       conflictChecker.findConflicts.mockResolvedValueOnce([
