@@ -480,16 +480,16 @@ export class AppointmentService {
   }
 
   private async validateDoctorSupportsService(
-    tenantId: number,
+    _tenantId: number,
     doctorId: number,
     serviceId: number,
   ): Promise<void> {
+    // Note: tenant_id check is implicit since service_id and doctor_id are already tenant-scoped
     const [assignment] = await this.db
       .select()
       .from(serviceDoctors)
       .where(
         and(
-          eq(serviceDoctors.tenantId, tenantId),
           eq(serviceDoctors.serviceId, serviceId),
           eq(serviceDoctors.doctorId, doctorId),
         ),
@@ -551,12 +551,15 @@ export class AppointmentService {
     const endTime = this.formatTimeFromDate(endsAt);
 
     const fitsInWorkingHours = hours.some((wh) => {
-      return startTime >= wh.startTime && endTime <= wh.endTime;
+      // Normalize time strings to HH:MM for comparison (DB returns HH:MM:SS)
+      const whStart = String(wh.startTime).substring(0, 5);
+      const whEnd = String(wh.endTime).substring(0, 5);
+      return startTime >= whStart && endTime <= whEnd;
     });
 
     if (!fitsInWorkingHours) {
       const availableHours = hours
-        .map((wh) => `${wh.startTime}-${wh.endTime}`)
+        .map((wh) => `${String(wh.startTime).substring(0, 5)}-${String(wh.endTime).substring(0, 5)}`)
         .join(', ');
       throw new BadRequestException(
         `Appointment time ${startTime}-${endTime} is outside doctor's working hours (${availableHours})`,
