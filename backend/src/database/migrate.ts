@@ -231,6 +231,8 @@ export async function runMigrations(): Promise<void> {
   await sql`CREATE INDEX IF NOT EXISTS idx_users_tenant ON users(tenant_id)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_audit_appointment ON appointment_audit_log(appointment_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_audit_tenant_time ON appointment_audit_log(tenant_id, performed_at DESC)`;
 
   console.log('Database schema created successfully');
 
