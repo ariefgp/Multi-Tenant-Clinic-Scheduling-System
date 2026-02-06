@@ -34,6 +34,9 @@ export async function runMigrations(): Promise<void> {
 
   console.log('Creating database schema...');
 
+  // Enable btree_gist extension for exclusion constraints
+  await sql`CREATE EXTENSION IF NOT EXISTS btree_gist`;
+
   // Create all tables
   await sql`
     CREATE TABLE IF NOT EXISTS tenants (
@@ -235,6 +238,62 @@ export async function runMigrations(): Promise<void> {
   await sql`CREATE INDEX IF NOT EXISTS idx_audit_tenant_time ON appointment_audit_log(tenant_id, performed_at DESC)`;
 
   console.log('Database schema created successfully');
+
+  // Create exclusion constraints for race condition prevention
+  console.log('Creating exclusion constraints...');
+
+  // Prevent doctor double-booking (with buffers)
+  await sql`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'no_doctor_overlap'
+      ) THEN
+        ALTER TABLE appointments ADD CONSTRAINT no_doctor_overlap
+        EXCLUDE USING gist (
+          tenant_id WITH =,
+          doctor_id WITH =,
+          tstzrange(starts_at - buffer_before, ends_at + buffer_after) WITH &&
+        ) WHERE (status NOT IN ('cancelled'));
+      END IF;
+    END $$
+  `;
+
+  // Prevent room double-booking (only when room_id is not null)
+  await sql`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'no_room_overlap'
+      ) THEN
+        ALTER TABLE appointments ADD CONSTRAINT no_room_overlap
+        EXCLUDE USING gist (
+          tenant_id WITH =,
+          room_id WITH =,
+          tstzrange(starts_at - buffer_before, ends_at + buffer_after) WITH &&
+        ) WHERE (status NOT IN ('cancelled') AND room_id IS NOT NULL);
+      END IF;
+    END $$
+  `;
+
+  // Prevent device double-booking
+  await sql`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'no_device_overlap'
+      ) THEN
+        ALTER TABLE appointment_devices ADD CONSTRAINT no_device_overlap
+        EXCLUDE USING gist (
+          tenant_id WITH =,
+          device_id WITH =,
+          tstzrange(starts_at, ends_at) WITH &&
+        );
+      END IF;
+    END $$
+  `;
+
+  console.log('Exclusion constraints created');
 
   // Enable Row Level Security
   console.log('Enabling Row Level Security...');
