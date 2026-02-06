@@ -216,7 +216,7 @@ export async function runMigrations(): Promise<void> {
       email VARCHAR(255) NOT NULL UNIQUE,
       google_id VARCHAR(255) UNIQUE,
       name VARCHAR(255) NOT NULL,
-      picture VARCHAR(512),
+      picture TEXT,
       role VARCHAR(50) NOT NULL DEFAULT 'staff',
       is_active BOOLEAN NOT NULL DEFAULT true,
       last_login_at TIMESTAMPTZ,
@@ -483,6 +483,11 @@ async function addMissingColumns(sql: any): Promise<void> {
     SET tenant_id = s.tenant_id
     FROM services s
     WHERE sd.service_id = s.id AND sd.tenant_id IS NULL
+  `;
+
+  // Widen users.picture from varchar(512) to text for long Google profile URLs
+  await sql`
+    ALTER TABLE users ALTER COLUMN picture TYPE TEXT
   `;
 
   console.log('Missing columns added');
