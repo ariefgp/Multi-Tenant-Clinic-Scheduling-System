@@ -49,6 +49,32 @@ jobs:
           cluster_name: ${{ env.GKE_CLUSTER }}
           location: ${{ env.GCP_REGION }}
 
+      # Create / update Kubernetes secrets (avoid committing secret values)
+      - name: Create backend secrets
+        env:
+          DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_CALLBACK_URL: ${{ secrets.GOOGLE_CALLBACK_URL }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          JWT_EXPIRES_IN: ${{ secrets.JWT_EXPIRES_IN }}
+          JWT_REFRESH_EXPIRES_IN: ${{ secrets.JWT_REFRESH_EXPIRES_IN }}
+          FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
+        run: |
+          # Ensure namespace exists (first deploy)
+          kubectl apply -f k8s/namespace.yaml
+
+          kubectl -n clinic create secret generic backend-secrets \
+            --from-literal=DATABASE_URL="$DATABASE_URL" \
+            --from-literal=GOOGLE_CLIENT_ID="$GOOGLE_CLIENT_ID" \
+            --from-literal=GOOGLE_CLIENT_SECRET="$GOOGLE_CLIENT_SECRET" \
+            --from-literal=GOOGLE_CALLBACK_URL="$GOOGLE_CALLBACK_URL" \
+            --from-literal=JWT_SECRET="$JWT_SECRET" \
+            --from-literal=JWT_EXPIRES_IN="${JWT_EXPIRES_IN:-15m}" \
+            --from-literal=JWT_REFRESH_EXPIRES_IN="${JWT_REFRESH_EXPIRES_IN:-7d}" \
+            --from-literal=FRONTEND_URL="$FRONTEND_URL" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
       # Deploy to GKE
       - name: Deploy to GKE
         run: |
@@ -62,5 +88,22 @@ jobs:
           kubectl apply -f k8s/backend-hpa.yaml
           kubectl apply -f k8s/frontend-deployment.yaml
           kubectl apply -f k8s/frontend-service.yaml
-          kubectl rollout status deployment/backend -n clinic --timeout=120s
-          kubectl rollout status deployment/frontend -n clinic --timeout=120s
+
+          # Backend rollout (print debugging info on failure)
+          kubectl rollout status deployment/backend -n clinic --timeout=300s || {
+            kubectl get pods -n clinic -l app=backend -o wide
+            kubectl describe deployment/backend -n clinic
+            kubectl describe pods -n clinic -l app=backend
+            kubectl logs -n clinic -l app=backend --tail=200 || true
+            kubectl logs -n clinic -l app=backend --previous --tail=200 || true
+            exit 1
+          }
+
+          kubectl rollout status deployment/frontend -n clinic --timeout=300s || {
+            kubectl get pods -n clinic -l app=frontend -o wide
+            kubectl describe deployment/frontend -n clinic
+            kubectl describe pods -n clinic -l app=frontend
+            kubectl logs -n clinic -l app=frontend --tail=200 || true
+            kubectl logs -n clinic -l app=frontend --previous --tail=200 || true
+            exit 1
+          }

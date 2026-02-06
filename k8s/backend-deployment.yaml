@@ -49,6 +49,11 @@ spec:
                 secretKeyRef:
                   name: backend-secrets
                   key: JWT_EXPIRES_IN
+            - name: JWT_REFRESH_EXPIRES_IN
+              valueFrom:
+                secretKeyRef:
+                  name: backend-secrets
+                  key: JWT_REFRESH_EXPIRES_IN
             - name: FRONTEND_URL
               valueFrom:
                 secretKeyRef:
@@ -63,11 +68,16 @@ spec:
             limits:
               cpu: 500m
               memory: 512Mi
+          startupProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            failureThreshold: 30
+            periodSeconds: 10
           livenessProbe:
             httpGet:
               path: /api/health
               port: 3000
-            initialDelaySeconds: 10
             periodSeconds: 30
           readinessProbe:
             httpGet:
