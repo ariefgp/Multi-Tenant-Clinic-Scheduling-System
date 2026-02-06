@@ -150,7 +150,6 @@ export class AvailabilityService {
             if (
               this.hasBreakOverlap(
                 breaksData,
-                'doctor',
                 doctorId,
                 effectiveStart,
                 effectiveEnd,
@@ -169,13 +168,6 @@ export class AvailabilityService {
                 (r) =>
                   !this.findOverlappingInterval(
                     roomBusy.get(r.id),
-                    effectiveStart,
-                    effectiveEnd,
-                  ) &&
-                  !this.hasBreakOverlap(
-                    breaksData,
-                    'room',
-                    r.id,
                     effectiveStart,
                     effectiveEnd,
                   ),
@@ -307,8 +299,8 @@ export class AvailabilityService {
       .where(
         and(
           eq(breaks.tenantId, tenantId),
-          lte(breaks.startsAt, to),
-          gte(breaks.endsAt, from),
+          lte(breaks.startTime, to),
+          gte(breaks.endTime, from),
         ),
       );
   }
@@ -429,18 +421,16 @@ export class AvailabilityService {
   }
 
   private hasBreakOverlap(
-    allBreaks: { resourceType: string; resourceId: number; startsAt: Date; endsAt: Date }[],
-    resourceType: string,
-    resourceId: number,
+    allBreaks: { doctorId: number; startTime: Date; endTime: Date }[],
+    doctorId: number,
     start: Date,
     end: Date,
   ): boolean {
     return allBreaks.some(
       (b) =>
-        b.resourceType === resourceType &&
-        b.resourceId === resourceId &&
-        b.startsAt.getTime() < end.getTime() &&
-        b.endsAt.getTime() > start.getTime(),
+        b.doctorId === doctorId &&
+        b.startTime.getTime() < end.getTime() &&
+        b.endTime.getTime() > start.getTime(),
     );
   }
 

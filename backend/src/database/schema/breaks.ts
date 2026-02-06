@@ -7,6 +7,7 @@ import {
   index,
 } from 'drizzle-orm/pg-core';
 import { tenants } from './tenants.js';
+import { doctors } from './doctors.js';
 
 export const breaks = pgTable(
   'breaks',
@@ -15,18 +16,14 @@ export const breaks = pgTable(
     tenantId: bigint('tenant_id', { mode: 'number' })
       .notNull()
       .references(() => tenants.id, { onDelete: 'cascade' }),
-    resourceType: varchar('resource_type', { length: 20 }).notNull(),
-    resourceId: bigint('resource_id', { mode: 'number' }).notNull(),
-    startsAt: timestamp('starts_at', { withTimezone: true }).notNull(),
-    endsAt: timestamp('ends_at', { withTimezone: true }).notNull(),
+    doctorId: bigint('doctor_id', { mode: 'number' })
+      .notNull()
+      .references(() => doctors.id, { onDelete: 'cascade' }),
+    startTime: timestamp('start_time', { withTimezone: true }).notNull(),
+    endTime: timestamp('end_time', { withTimezone: true }).notNull(),
     reason: varchar({ length: 255 }),
   },
   (table) => [
-    index('idx_breaks_resource').on(
-      table.tenantId,
-      table.resourceType,
-      table.resourceId,
-      table.startsAt,
-    ),
+    index('idx_breaks_doctor').on(table.doctorId, table.startTime),
   ],
 );

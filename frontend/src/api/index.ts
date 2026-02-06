@@ -4,6 +4,7 @@ import type {
   Doctor,
   Patient,
   Service,
+  Room,
   AvailabilityResponse,
   CreateAppointmentRequest,
 } from '../types/index.ts';
@@ -18,6 +19,10 @@ export const patientsApi = {
 
 export const servicesApi = {
   list: () => api.get<Service[]>('/services').then((r) => r.data),
+};
+
+export const roomsApi = {
+  list: () => api.get<Room[]>('/rooms').then((r) => r.data),
 };
 
 export const appointmentsApi = {
