@@ -109,7 +109,7 @@ export async function runMigrations(): Promise<void> {
       duration_minutes INT NOT NULL DEFAULT 30,
       buffer_before_min INT NOT NULL DEFAULT 0,
       buffer_after_min INT NOT NULL DEFAULT 0,
-      requires_room BOOLEAN NOT NULL DEFAULT false,
+      requires_room BOOLEAN NOT NULL DEFAULT true,
       color VARCHAR(7),
       is_active BOOLEAN NOT NULL DEFAULT true,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
