@@ -274,3 +274,30 @@ CREATE POLICY tenant_isolation_service_doctors ON service_doctors
 
 CREATE POLICY tenant_isolation_service_devices ON service_devices
     USING (tenant_id = current_setting('app.current_tenant', true)::BIGINT);
+
+-- ============================================
+-- USERS (Staff authentication)
+-- ============================================
+
+CREATE TABLE users (
+    id              BIGSERIAL PRIMARY KEY,
+    tenant_id       BIGINT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    email           VARCHAR(255) NOT NULL UNIQUE,
+    google_id       VARCHAR(255) UNIQUE,
+    name            VARCHAR(255) NOT NULL,
+    picture         VARCHAR(512),
+    role            VARCHAR(50) NOT NULL DEFAULT 'staff',
+    is_active       BOOLEAN NOT NULL DEFAULT true,
+    last_login_at   TIMESTAMPTZ,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_users_tenant ON users(tenant_id);
+CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX idx_users_google_id ON users(google_id);
+
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY tenant_isolation_users ON users
+    USING (tenant_id = current_setting('app.current_tenant', true)::BIGINT);

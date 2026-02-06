@@ -7,3 +7,4 @@ export * from './services.js';
 export * from './working-hours.js';
 export * from './breaks.js';
 export * from './appointments.js';
+export * from './users.js';
