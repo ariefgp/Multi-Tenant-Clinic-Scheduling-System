@@ -1,98 +1,149 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Clinic Scheduler Backend
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+NestJS API server for the Multi-Tenant Clinic Scheduling System.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Tech Stack
 
-## Description
+- NestJS 11 with Fastify adapter
+- Drizzle ORM with Neon PostgreSQL driver
+- Passport JWT for authentication
+- Google OAuth 2.0 for staff login
+- Zod for validation
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## Setup
 
-## Project setup
+### Install Dependencies
 
 ```bash
-$ pnpm install
+pnpm install
 ```
 
-## Compile and run the project
+### Configure Environment
+
+Create `.env.local` file:
+
+```env
+# Database
+DATABASE_URL=postgresql://user:pass@localhost:5432/clinic
+
+# Google OAuth
+GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your-client-secret
+GOOGLE_CALLBACK_URL=http://localhost:3000/api/auth/google/callback
+
+# JWT
+JWT_SECRET=your-secret-key-at-least-32-chars
+JWT_EXPIRES_IN=15m
+JWT_REFRESH_EXPIRES_IN=7d
+
+# Frontend URL (for OAuth redirect)
+FRONTEND_URL=http://localhost:5173
+```
+
+### Run Development Server
 
 ```bash
-# development
-$ pnpm run start
-
-# watch mode
-$ pnpm run start:dev
-
-# production mode
-$ pnpm run start:prod
+pnpm start:dev
 ```
 
-## Run tests
+Server runs at http://localhost:3000. Swagger docs at http://localhost:3000/docs.
+
+## Project Structure
+
+```
+src/
+├── modules/
+│   ├── auth/           Google OAuth + JWT authentication
+│   │   ├── strategies/ JWT strategy
+│   │   ├── guards/     Auth guards
+│   │   ├── decorators/ @CurrentUser, @Public
+│   │   ├── dto/        Response DTOs
+│   │   ├── auth.service.ts
+│   │   └── auth.controller.ts
+│   ├── appointment/    CRUD + conflict checking
+│   ├── availability/   Slot search algorithm
+│   ├── doctor/
+│   ├── patient/
+│   ├── service/
+│   ├── room/
+│   └── device/
+├── database/
+│   ├── schema/         Drizzle table definitions
+│   ├── database.module.ts
+│   └── migrate.ts      Auto-migration on startup
+└── common/
+    ├── middleware/     Tenant ID middleware
+    ├── guards/         Tenant guard
+    └── filters/        Exception filters
+```
+
+## API Endpoints
+
+### Authentication (Public)
+
+```
+GET  /api/auth/google          → Redirect to Google OAuth
+GET  /api/auth/google/callback → Handle OAuth callback
+POST /api/auth/refresh         → Refresh access token
+```
+
+### Authentication (JWT Required)
+
+```
+POST /api/auth/logout          → Logout
+GET  /api/auth/me              → Get current user
+```
+
+### Resources (JWT + Tenant Required)
+
+```
+GET  /api/doctors              → List doctors
+GET  /api/patients             → List patients
+GET  /api/services             → List services
+GET  /api/rooms                → List rooms
+GET  /api/devices              → List devices
+```
+
+### Appointments (JWT + Tenant Required)
+
+```
+POST   /api/appointments       → Create appointment
+GET    /api/appointments/:id   → Get appointment
+PATCH  /api/appointments/:id   → Reschedule
+DELETE /api/appointments/:id   → Cancel
+GET    /api/schedule           → All appointments
+GET    /api/doctors/:id/schedule → Doctor schedule
+GET    /api/availability       → Search available slots
+```
+
+## Scripts
 
 ```bash
-# unit tests
-$ pnpm run test
-
-# e2e tests
-$ pnpm run test:e2e
-
-# test coverage
-$ pnpm run test:cov
+pnpm start:dev   # Development with hot reload
+pnpm start:prod  # Production mode
+pnpm build       # Build for production
+pnpm lint        # Run ESLint
+pnpm test        # Run tests
 ```
 
-## Deployment
+## Database
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+The database schema is automatically created on first startup. See `src/database/migrate.ts` for the migration logic.
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+Tables:
+- tenants, users
+- doctors, patients, rooms, devices
+- services, service_doctors, service_devices
+- working_hours, breaks
+- appointments, appointment_devices, appointment_audit_log
 
-```bash
-$ pnpm install -g @nestjs/mau
-$ mau deploy
-```
+## Authentication Flow
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+1. Frontend redirects to `/api/auth/google`
+2. Backend redirects to Google consent screen
+3. User authenticates with Google
+4. Google redirects back with auth code
+5. Backend exchanges code for tokens
+6. Backend creates/updates user record
+7. Backend generates JWT tokens
+8. Backend redirects to frontend with tokens
