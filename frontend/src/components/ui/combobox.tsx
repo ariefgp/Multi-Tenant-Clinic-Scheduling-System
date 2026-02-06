@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import { Check, ChevronsUpDown, Search } from 'lucide-react';
 import { cn } from '../../lib/utils.ts';
 import { Button } from './button.tsx';
@@ -31,9 +30,7 @@ export function Combobox({
 }: ComboboxProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
-  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const selectedOption = options.find((opt) => opt.value === value);
@@ -42,28 +39,12 @@ export function Combobox({
     opt.label.toLowerCase().includes(search.toLowerCase()),
   );
 
-  // Position dropdown relative to trigger
-  useEffect(() => {
-    if (open && triggerRef.current) {
-      const rect = triggerRef.current.getBoundingClientRect();
-      setDropdownStyle({
-        position: 'fixed',
-        top: rect.bottom + 4,
-        left: rect.left,
-        width: rect.width,
-      });
-    }
-  }, [open]);
-
   // Close on outside click
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as Node;
       if (
-        triggerRef.current &&
-        !triggerRef.current.contains(target) &&
-        dropdownRef.current &&
-        !dropdownRef.current.contains(target)
+        containerRef.current &&
+        !containerRef.current.contains(e.target as Node)
       ) {
         setOpen(false);
         setSearch('');
@@ -76,7 +57,7 @@ export function Combobox({
   // Focus input when opened
   useEffect(() => {
     if (open && inputRef.current) {
-      inputRef.current.focus();
+      setTimeout(() => inputRef.current?.focus(), 0);
     }
   }, [open]);
 
@@ -86,13 +67,24 @@ export function Combobox({
     setSearch('');
   };
 
-  const dropdown = open
-    ? createPortal(
-        <div
-          ref={dropdownRef}
-          style={dropdownStyle}
-          className="z-[200] rounded-md border border-gray-200 bg-white shadow-lg"
-        >
+  return (
+    <div ref={containerRef} className="relative">
+      <Button
+        type="button"
+        variant="outline"
+        role="combobox"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+        className={cn('w-full justify-between font-normal', className)}
+      >
+        <span className={cn(!selectedOption && 'text-gray-500')}>
+          {selectedOption?.label ?? placeholder}
+        </span>
+        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+      </Button>
+
+      {open && (
+        <div className="absolute left-0 top-full z-50 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-lg">
           <div className="flex items-center border-b px-3">
             <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
             <input
@@ -101,6 +93,12 @@ export function Combobox({
               placeholder={searchPlaceholder}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') {
+                  setOpen(false);
+                  setSearch('');
+                }
+              }}
             />
           </div>
           <div className="max-h-60 overflow-auto p-1">
@@ -114,7 +112,7 @@ export function Combobox({
                   key={opt.value}
                   type="button"
                   onClick={() => handleSelect(opt)}
-                  className="relative flex w-full cursor-pointer select-none items-center rounded-sm px-2 py-2 text-sm outline-none hover:bg-gray-100"
+                  className="relative flex w-full cursor-pointer select-none items-center rounded-sm px-2 py-2 text-sm outline-none hover:bg-gray-100 focus:bg-gray-100"
                 >
                   <Check
                     className={cn(
@@ -134,28 +132,8 @@ export function Combobox({
               ))
             )}
           </div>
-        </div>,
-        document.body,
-      )
-    : null;
-
-  return (
-    <div className="relative">
-      <Button
-        ref={triggerRef}
-        type="button"
-        variant="outline"
-        role="combobox"
-        aria-expanded={open}
-        onClick={() => setOpen(!open)}
-        className={cn('w-full justify-between font-normal', className)}
-      >
-        <span className={cn(!selectedOption && 'text-gray-500')}>
-          {selectedOption?.label ?? placeholder}
-        </span>
-        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-      </Button>
-      {dropdown}
+        </div>
+      )}
     </div>
   );
 }

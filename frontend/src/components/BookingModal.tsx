@@ -157,7 +157,8 @@ export function BookingModal({ initialDate, onClose }: BookingModalProps) {
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent
         className={cn(
-          'max-h-[90vh] overflow-y-auto',
+          'max-h-[90vh]',
+          step === 'select' ? 'overflow-visible' : 'overflow-y-auto',
           step === 'slots' ? 'sm:max-w-2xl' : 'sm:max-w-md',
         )}
       >
@@ -166,8 +167,8 @@ export function BookingModal({ initialDate, onClose }: BookingModalProps) {
         </DialogHeader>
 
         {step === 'select' && (
-          <div className="space-y-4">
-            <div className="space-y-2">
+          <div className="space-y-4 overflow-visible">
+            <div className="relative space-y-2">
               <label className="text-sm font-medium">Service</label>
               <Combobox
                 options={serviceOptions}
