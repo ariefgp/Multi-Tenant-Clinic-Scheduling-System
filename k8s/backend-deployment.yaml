@@ -22,8 +22,38 @@ spec:
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
-                  name: clinic-secrets
+                  name: backend-secrets
                   key: DATABASE_URL
+            - name: GOOGLE_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: backend-secrets
+                  key: GOOGLE_CLIENT_ID
+            - name: GOOGLE_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: backend-secrets
+                  key: GOOGLE_CLIENT_SECRET
+            - name: GOOGLE_CALLBACK_URL
+              valueFrom:
+                secretKeyRef:
+                  name: backend-secrets
+                  key: GOOGLE_CALLBACK_URL
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: backend-secrets
+                  key: JWT_SECRET
+            - name: JWT_EXPIRES_IN
+              valueFrom:
+                secretKeyRef:
+                  name: backend-secrets
+                  key: JWT_EXPIRES_IN
+            - name: FRONTEND_URL
+              valueFrom:
+                secretKeyRef:
+                  name: backend-secrets
+                  key: FRONTEND_URL
             - name: NODE_ENV
               value: 'production'
           resources:
