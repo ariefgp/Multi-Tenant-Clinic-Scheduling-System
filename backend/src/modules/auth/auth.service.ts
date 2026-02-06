@@ -6,7 +6,7 @@ import {
   DATABASE_CONNECTION,
   type DatabaseConnection,
 } from '../../database/database.module.js';
-import { users } from '../../database/schema/index.js';
+import { users, tenants } from '../../database/schema/index.js';
 import type { AuthTokensDto, UserDto } from './dto/auth-response.dto.js';
 
 interface GoogleUserProfile {
@@ -51,10 +51,28 @@ export class AuthService {
     }
 
     if (!user) {
+      // TODO: Real multi-tenant signup flow should determine tenant from:
+      // 1. Invite link (user clicks invite from tenant admin)
+      // 2. Email domain matching (e.g., @company.com -> company tenant)
+      // 3. Tenant selection during OAuth callback
+      // For demo purposes, we assign new users to the default 'demo-clinic' tenant
+      const DEFAULT_TENANT_SLUG = 'demo-clinic';
+
+      const [defaultTenant] = await this.db
+        .select({ id: tenants.id })
+        .from(tenants)
+        .where(eq(tenants.slug, DEFAULT_TENANT_SLUG));
+
+      if (!defaultTenant) {
+        throw new UnauthorizedException(
+          `Default tenant '${DEFAULT_TENANT_SLUG}' not found. Please contact administrator.`,
+        );
+      }
+
       [user] = await this.db
         .insert(users)
         .values({
-          tenantId: 1,
+          tenantId: defaultTenant.id,
           email: profile.email,
           googleId: profile.googleId,
           name: profile.name,
