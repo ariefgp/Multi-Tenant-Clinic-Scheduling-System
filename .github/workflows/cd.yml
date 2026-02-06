@@ -56,7 +56,17 @@ jobs:
           sed -i "s|frontend:latest|frontend:${{ github.sha }}|g" k8s/frontend-deployment.yaml
           sed -i "s|REGION|${{ env.GCP_REGION }}|g" k8s/*.yaml
           sed -i "s|PROJECT_ID|${{ env.GCP_PROJECT_ID }}|g" k8s/*.yaml
+
+          # Replace secret placeholders with actual values from GitHub secrets
+          sed -i "s|PLACEHOLDER_DATABASE_URL|${{ secrets.DATABASE_URL }}|g" k8s/secrets.yaml
+          sed -i "s|PLACEHOLDER_GOOGLE_CLIENT_ID|${{ secrets.GOOGLE_CLIENT_ID }}|g" k8s/secrets.yaml
+          sed -i "s|PLACEHOLDER_GOOGLE_CLIENT_SECRET|${{ secrets.GOOGLE_CLIENT_SECRET }}|g" k8s/secrets.yaml
+          sed -i "s|PLACEHOLDER_GOOGLE_CALLBACK_URL|${{ secrets.GOOGLE_CALLBACK_URL }}|g" k8s/secrets.yaml
+          sed -i "s|PLACEHOLDER_JWT_SECRET|${{ secrets.JWT_SECRET }}|g" k8s/secrets.yaml
+          sed -i "s|PLACEHOLDER_FRONTEND_URL|${{ secrets.FRONTEND_URL }}|g" k8s/secrets.yaml
+
           kubectl apply -f k8s/namespace.yaml
+          kubectl apply -f k8s/secrets.yaml
           kubectl apply -f k8s/backend-deployment.yaml
           kubectl apply -f k8s/backend-service.yaml
           kubectl apply -f k8s/backend-hpa.yaml
