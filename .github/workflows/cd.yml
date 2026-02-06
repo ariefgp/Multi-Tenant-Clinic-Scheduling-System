@@ -57,6 +57,10 @@ jobs:
           sed -i "s|REGION|${{ env.GCP_REGION }}|g" k8s/*.yaml
           sed -i "s|PROJECT_ID|${{ env.GCP_PROJECT_ID }}|g" k8s/*.yaml
           kubectl apply -f k8s/namespace.yaml
-          kubectl apply -f k8s/
+          kubectl apply -f k8s/backend-deployment.yaml
+          kubectl apply -f k8s/backend-service.yaml
+          kubectl apply -f k8s/backend-hpa.yaml
+          kubectl apply -f k8s/frontend-deployment.yaml
+          kubectl apply -f k8s/frontend-service.yaml
           kubectl rollout status deployment/backend -n clinic --timeout=120s
           kubectl rollout status deployment/frontend -n clinic --timeout=120s
