@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { format, addDays } from 'date-fns';
+import { format, addDays, startOfDay } from 'date-fns';
 import {
   servicesApi,
   doctorsApi,
@@ -57,13 +57,17 @@ export function BookingModal({ initialDate, onClose }: BookingModalProps) {
     queryFn: patientsApi.list,
   });
 
-  const fromDate = initialDate ?? new Date();
+  // Stabilize fromDate to prevent infinite refetch loop
+  const fromDate = useMemo(
+    () => startOfDay(initialDate ?? new Date()),
+    [initialDate],
+  );
   const { data: availability, isLoading: isLoadingSlots } = useQuery({
     queryKey: [
       'availability',
       selectedService,
       selectedDoctor,
-      fromDate.toISOString(),
+      fromDate.getTime(),
     ],
     queryFn: () =>
       availabilityApi.search({
